@@ -1,7 +1,7 @@
 import MGSimHelps
 
 
-def readLammpsFile(system, file):
+def readLammpsFile(system, file):  # TODO Implement additional information that can be found in file
     """Read content of the LAMMPS Trajectory file (extension .lammpstrj).
 
     :param system: [AtomsSystem] - AtomsSystem object
@@ -14,6 +14,8 @@ def readLammpsFile(system, file):
             if keyvalue[2].isupper():
                 if keyvalue[2] == "TIMESTEP":
                     command = "timestep"
+                elif keyvalue[2] == "TIME":
+                    command = "time"
                 elif keyvalue[2] == "NUMBER OF ATOMS":
                     command = "nr_atoms"
                 else:
@@ -37,6 +39,8 @@ def readLammpsFile(system, file):
         else:
             if command == "timestep":
                 system.timestep = int(keyvalue[0])
+            elif command == "time":
+                system.time = float(keyvalue[0])
             elif command == "nr_atoms":
                 pass  # nr of atoms
             elif command == "box_bounds":
@@ -72,6 +76,8 @@ def readLammpsFile(system, file):
                     atom.type = int(temp_dict["type"])
                 if "name" in temp_dict:
                     atom.name = temp_dict["name"]
+                if "element" in temp_dict:
+                    atom.name = temp_dict["element"]
                 if "q" in temp_dict:
                     atom.charge = float(temp_dict["q"])
                 if "vx" in temp_dict or "vy" in temp_dict or "vz" in temp_dict:
@@ -83,6 +89,12 @@ def readLammpsFile(system, file):
                     if "vz" in temp_dict:
                         temp_v[2] = float(temp_dict["vz"])
                     atom.velocity = tuple(temp_v)
+                if "mass" in temp_dict:
+                    atom.mass = float(temp_dict["mass"])
+                if "c_sput_ke" in temp_dict:
+                    atom.energy["kinetic"] = float(temp_dict["c_sput_ke"])
+                if "c_sput_pe" in temp_dict:
+                    atom.energy["potential"] = float(temp_dict["c_sput_pe"])
                 system.addAtom(atom)
             else:
                 raise NameError("Unknown command: " + command)

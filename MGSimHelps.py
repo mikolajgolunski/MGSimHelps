@@ -15,17 +15,21 @@ class Atom:
 
     As a default contains:
         coords [tuple]:
-            [float] - x coordinate
-            [float] - y coordinate
-            [float] - z coordinate
-        id [int] - atom id
-        charge [float] - atom charge
+            0.0 [float] - x coordinate
+            0.0 [float] - y coordinate
+            0.0 [float] - z coordinate
+        id (incrementing) [int] - atom id
+        charge 0.0 [float] - atom charge
         velocity [tuple]:
-            [float] - x velocity
-            [float] - y velocity
-            [float] - z velocity
-        type [int] - atom type
-        name [string] - atom name
+            0.0 [float] - x velocity
+            0.0 [float] - y velocity
+            0.0 [float] - z velocity
+        type 1 [int] - atom type
+        name "Xxx" [string] - atom name
+        mass 1.0 [float] - atom mass
+        energy [dict]:
+            "kinetic": 0.0 [float] - kinetic energy
+            "potential": 0.0 [float] - potential energy
     """
 
     _new_id = next(itertools.count())
@@ -37,6 +41,8 @@ class Atom:
         self.velocity = (0.0, 0.0, 0.0)
         self.type = 1
         self.name = "Xxx"
+        self.mass = 1.0
+        self.energy = {"kinetic": 0.0, "potential": 0.0}
 
     def __str__(self):
         return "Atom ID " + str(self.id) + ", type " + str(self.type) + ", name " + self.name + \
@@ -47,22 +53,23 @@ class AtomsSystem:
     """System of Atom objects.
 
     As a default contains:
-        atoms [list]:
+        atoms [] [list]:
             [Atom] - list of Atom objects
-        number [int] - number of atoms in the AtomsSystem
-        timestep [int] - timestep
+        number 0 [int] - number of atoms in the AtomsSystem
+        timestep 0 [int] - timestep
         bounds [dict]:
             "xlo" [tuple]: - lower x boundary
-                [string] - boundary type
-                [float] - boundary value
+                "f" [string] - boundary type
+                -1.0 [float] - boundary value
             "xhi" [tuple]: - higher x boundary
-                [string] - boundary type
-                [float] - boundary value
+                "f" [string] - boundary type
+                1.0 [float] - boundary value
             "ylo" ...
             "yhi" ...
             "zlo" ...
             "zhi" ...
-        max_type [int] - maximum type of atom (often equal to number of types)
+        max_type 1 [int] - maximum type of atom (often equal to number of types)
+        time 0.0 [float] - time of simulation in fs
     """
 
     def __init__(self):
@@ -79,6 +86,7 @@ class AtomsSystem:
             "zhi": ("f", 1.0)
         }
         self.max_type = 1
+        self.time = 0.0
 
     def __iter__(self):
         return self
@@ -160,9 +168,25 @@ class AtomsSystem:
         :param file_type: [string] - [Default: "auto"] type of the file. If "auto" than type determined by extension
                 of the file specified in file_path:
             "lammps_data" - file read by LAMMPS's function read_data
+            "lammpstrj" - LAMMPS trajectory file
         :param control_dict: [dict] - [Default: {}] dictionary consisting of additional controls that may be needed:
-            "lammps_data_type":
+            "lammps_data_type": - type of data (one of) for lammps_data
                 "charge"
+            "properties": - list of properties (any of) for lammpstrj
+                "id"
+                "element"
+                "type"
+                "name"
+                "x"
+                "y"
+                "z"
+                "charge"
+                "mass"
+                "vx"
+                "vy"
+                "vz"
+                "kinetic_energy"
+                "potential_energy"
         """
         if control_dict is None:
             control_dict = {}
@@ -179,5 +203,7 @@ class AtomsSystem:
         with open(file_path, "w") as file:
             if file_type == "lammps_data":
                 MGSaveFile.saveLammpsDataFile(self, file, control_dict)
+            elif file_type == "lammpstrj":
+                MGSaveFile.saveLammpsFile(self, file, control_dict)
             else:
                 raise NotImplementedError("No implementation for the " + file_type + " file_type.")
