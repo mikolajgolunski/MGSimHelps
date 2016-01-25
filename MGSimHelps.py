@@ -131,9 +131,11 @@ class AtomsSystem:
             "lammps_data_type":
                 "charge"
         """
+        print("Reading file.")
         if control_dict is None:
             control_dict = {}
         if file_type == "auto":
+            print(" Detecting filetype automaticaly: ", end="")
             file_ext = os.path.splitext(file_path)[1][1:].strip().lower()
             if file_ext == "lammpstrj":
                 file_type = "lammpstrj"
@@ -143,6 +145,7 @@ class AtomsSystem:
                 raise NotImplementedError(
                         "No implementation for the " + file_ext + " extension. Please set file_type explicitly."
                 )
+            print(file_type)
 
         with open(file_path, "r") as file:
             if file_type == "lammpstrj":
@@ -151,15 +154,9 @@ class AtomsSystem:
                 MGReadFile.readLammpsDataFile(self, file, control_dict)
             else:
                 raise NotImplementedError("No implementation for the " + file_type + " file_type.")
+        print("Successfully read system from " + file_path + " as a " + file_type + " file.")
 
-        atoms_names = []
-        for atom in self.atoms:
-            if atom.name not in atoms_names:
-                atoms_names.append(atom.name)
-            if atom.type == 1:
-                atom.type = atoms_names.index(atom.name) + 1
-            if atom.type > self.max_type:
-                self.max_type = atom.type
+        self.recalculateTypes()
 
     def saveFile(self, file_path, file_type="auto", control_dict=None):
         """Save file of the set type using data in the AtomsSystem.
@@ -188,9 +185,11 @@ class AtomsSystem:
                 "kinetic_energy"
                 "potential_energy"
         """
+        print("Saving file.")
         if control_dict is None:
             control_dict = {}
         if file_type == "auto":
+            print(" Detecting filetype automaticaly: ", end="")
             file_ext = os.path.splitext(file_path)[1][1:].strip().lower()
             if file_ext == "lammpstrj":
                 file_type = "lammpstrj"
@@ -200,6 +199,7 @@ class AtomsSystem:
                 raise NotImplementedError(
                         "No implementation for the " + file_ext + " extension. Please set file_type explicitly."
                 )
+            print(file_type)
         with open(file_path, "w") as file:
             if file_type == "lammps_data":
                 MGSaveFile.saveLammpsDataFile(self, file, control_dict)
@@ -207,3 +207,42 @@ class AtomsSystem:
                 MGSaveFile.saveLammpsFile(self, file, control_dict)
             else:
                 raise NotImplementedError("No implementation for the " + file_type + " file_type.")
+        print("Successfully saved system to " + file_path + " as a " + file_type + " file.")
+
+    def recalculateBounds(self):
+        """Recalculate boundaries of the system."""
+        print("Recalculating boundaries of the system.")
+        offset = 0.1
+        max_coords = [0, 0, 0]
+        min_coords = [0, 0, 0]
+        for atom in self.atoms:
+            if atom.coords[0] > max_coords[0]:
+                max_coords[0] = atom.coords[0]
+            if atom.coords[0] < min_coords[0]:
+                min_coords[0] = atom.coords[0]
+            if atom.coords[1] > max_coords[1]:
+                max_coords[1] = atom.coords[1]
+            if atom.coords[1] < min_coords[1]:
+                min_coords[1] = atom.coords[1]
+            if atom.coords[2] > max_coords[2]:
+                max_coords[2] = atom.coords[2]
+            if atom.coords[2] < min_coords[2]:
+                min_coords[2] = atom.coords[2]
+        self.bounds["xhi"] = (self.bounds["xhi"][0], max_coords[0] + offset)
+        self.bounds["xlo"] = (self.bounds["xlo"][0], min_coords[0] - offset)
+        self.bounds["yhi"] = (self.bounds["yhi"][0], max_coords[1] + offset)
+        self.bounds["ylo"] = (self.bounds["ylo"][0], min_coords[1] - offset)
+        self.bounds["zhi"] = (self.bounds["zhi"][0], max_coords[2] + offset)
+        self.bounds["zlo"] = (self.bounds["zlo"][0], min_coords[2] - offset)
+
+    def recalculateTypes(self):
+        """Recalculate types of atoms."""
+        print("Recalculating types of atoms.")
+        atoms_names = []
+        for atom in self.atoms:
+            if atom.name not in atoms_names:
+                atoms_names.append(atom.name)
+            if atom.type == 1:
+                atom.type = atoms_names.index(atom.name) + 1
+            if atom.type > self.max_type:
+                self.max_type = atom.type
