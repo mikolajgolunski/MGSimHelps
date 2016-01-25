@@ -1,3 +1,5 @@
+from enum import Enum
+
 import MGSimHelps
 
 system = MGSimHelps.AtomsSystem()

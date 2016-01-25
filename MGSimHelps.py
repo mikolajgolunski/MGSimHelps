@@ -1,5 +1,6 @@
 import itertools
 import os.path
+from enum import Enum
 
 import MGReadFile
 import MGSaveFile
@@ -117,6 +118,8 @@ class AtomsSystem:
     def atoms(self, atoms):
         self._atoms = atoms
         self.number = len(self._atoms)
+
+    FileType = Enum("FileType", "auto lammpstrj lammps_data")
 
     def readFile(self, file_path, file_type="auto", control_dict=None):
         """Read file of specified type and save its content to the AtomsSystem.
