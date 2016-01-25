@@ -6,6 +6,48 @@ import MGReadFile
 import MGSaveFile
 
 
+class FileType(Enum):
+    auto = 1
+    lammpstrj = 2
+    lammps_data = 3
+    xyz = 4
+
+
+class LammpsDataStyle(Enum):
+    charge = 1
+
+
+class ControlDict(Enum):
+    lammps_data_style = 1
+    lammpstrj_properties = 2
+    lammpstrj_items = 3
+
+
+class LammpstrjProp(Enum):
+    id = 1
+    element = 2
+    type = 3
+    name = 4
+    x = 5
+    y = 6
+    z = 7
+    charge = 8
+    mass = 9
+    vx = 10
+    vy = 11
+    vz = 12
+    kinetic_energy = 13
+    potential_energy = 14
+
+
+class LammpstrjItem(Enum):
+    timestep = 1
+    time = 2
+    number_atoms = 3
+    bounds = 4
+    atoms = 5
+
+
 class Atom:
     """Object containing atoms.
 
@@ -50,7 +92,7 @@ class Atom:
                ", at " + str(self.coords)
 
 
-class AtomsSystem:
+class AtomsSystem:  # TODO: change tuples to lists
     """System of Atom objects.
 
     As a default contains:
@@ -119,9 +161,7 @@ class AtomsSystem:
         self._atoms = atoms
         self.number = len(self._atoms)
 
-    FileType = Enum("FileType", "auto lammpstrj lammps_data")
-
-    def readFile(self, file_path, file_type="auto", control_dict=None):
+    def readFile(self, file_path, file_type=FileType.auto, control_dict=None):
         """Read file of specified type and save its content to the AtomsSystem.
 
         :param file_path: [string] - path to the file
@@ -137,31 +177,31 @@ class AtomsSystem:
         print("Reading file.")
         if control_dict is None:
             control_dict = {}
-        if file_type == "auto":
-            print(" Detecting filetype automaticaly: ", end="")
+        if file_type == FileType.auto:
+            print("Detecting filetype automaticaly: ", end="")
             file_ext = os.path.splitext(file_path)[1][1:].strip().lower()
             if file_ext == "lammpstrj":
-                file_type = "lammpstrj"
+                file_type = FileType.lammpstrj
             elif file_ext == "xyz":
-                file_type = "xyz"
+                file_type = FileType.xyz
             else:
                 raise NotImplementedError(
                         "No implementation for the " + file_ext + " extension. Please set file_type explicitly."
                 )
-            print(file_type)
+            print(file_type.name)
 
         with open(file_path, "r") as file:
-            if file_type == "lammpstrj":
+            if file_type == FileType.lammpstrj:
                 MGReadFile.readLammpsFile(self, file)
-            elif file_type == "lammps_data":
+            elif file_type == FileType.lammps_data:
                 MGReadFile.readLammpsDataFile(self, file, control_dict)
             else:
-                raise NotImplementedError("No implementation for the " + file_type + " file_type.")
-        print("Successfully read system from " + file_path + " as a " + file_type + " file.")
+                raise NotImplementedError("No implementation for the " + str(file_type.name) + " file_type.")
+        print("Successfully read system from " + file_path + " as a " + str(file_type.name) + " file.")
 
         self.recalculateTypes()
 
-    def saveFile(self, file_path, file_type="auto", control_dict=None):
+    def saveFile(self, file_path, file_type=FileType.auto, control_dict=None):
         """Save file of the set type using data in the AtomsSystem.
 
         :param file_path: [string] - path to the output file.
@@ -191,26 +231,26 @@ class AtomsSystem:
         print("Saving file.")
         if control_dict is None:
             control_dict = {}
-        if file_type == "auto":
+        if file_type == FileType.auto:
             print(" Detecting filetype automaticaly: ", end="")
             file_ext = os.path.splitext(file_path)[1][1:].strip().lower()
             if file_ext == "lammpstrj":
-                file_type = "lammpstrj"
+                file_type = FileType.lammpstrj
             elif file_ext == "xyz":
-                file_type = "xyz"
+                file_type = FileType.xyz
             else:
                 raise NotImplementedError(
                         "No implementation for the " + file_ext + " extension. Please set file_type explicitly."
                 )
             print(file_type)
         with open(file_path, "w") as file:
-            if file_type == "lammps_data":
+            if file_type == FileType.lammps_data:
                 MGSaveFile.saveLammpsDataFile(self, file, control_dict)
-            elif file_type == "lammpstrj":
+            elif file_type == FileType.lammpstrj:
                 MGSaveFile.saveLammpsFile(self, file, control_dict)
             else:
-                raise NotImplementedError("No implementation for the " + file_type + " file_type.")
-        print("Successfully saved system to " + file_path + " as a " + file_type + " file.")
+                raise NotImplementedError("No implementation for the " + str(file_type.name) + " file_type.")
+        print("Successfully saved system to " + file_path + " as a " + str(file_type.name) + " file.")
 
     def recalculateBounds(self):
         """Recalculate boundaries of the system."""

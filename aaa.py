@@ -6,4 +6,4 @@ class Aaa(Enum):
     b = 2
     c = 3
 
-print(Aaa.a)
+print(str(Aaa.a.name))

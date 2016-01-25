@@ -1,3 +1,5 @@
+import MGSimHelps as MG
+
 def saveLammpsDataFile(system, file, control_dict):
     """Save the LAMMPS Data file (extension often .dat).
 
@@ -7,11 +9,12 @@ def saveLammpsDataFile(system, file, control_dict):
             "lammps_data_type": - type of data (one of)
                 "charge"
     """
-    if "lammps_data_type" not in control_dict:
-        raise NameError("Please provide the data type for LAMMPS data file.")
-    print("Saving system into LAMMPS Data file using " + control_dict["lammps_data_type"] + " style.")
+    if MG.ControlDict.lammps_data_style not in control_dict:
+        raise NameError("Please provide the data style for LAMMPS data file.")
+    print("Saving system into LAMMPS Data file using " + control_dict[MG.ControlDict.lammps_data_style].name +
+          " style.")
     modulo = round(system.number / 10)
-    if control_dict["lammps_data_type"] == "charge":
+    if control_dict[MG.ControlDict.lammps_data_style] == MG.LammpsDataStyle.charge:
         print("Writing header.")
         file.write(
             "LAMMPS data file. CGCMM style. atom_style charge. Converted by Mikolaj Golunski (MGSimHelp utility).\n"
@@ -31,7 +34,8 @@ def saveLammpsDataFile(system, file, control_dict):
                 print("Written " + str(i) + " out of " + str(system.number) + " atoms.")
         print("Finished writing atoms.")
     else:
-        raise NotImplementedError("Data type " + control_dict["lammps_data_type"] + " is not implemented.")
+        raise NotImplementedError("Data type " + control_dict[MG.ControlDict.lammps_data_style] +
+                                  " is not implemented.")
 
 
 def saveLammpsFile(system, file, control_dict):
@@ -63,28 +67,31 @@ def saveLammpsFile(system, file, control_dict):
             "atoms"
     """
     print("Saving LAMPPS trajectory file with following items: ", end="")
-    if "items" not in control_dict:
-        control_dict["items"] = ["timestep", "time", "number_atoms", "bounds", "atoms"]
+    if MG.ControlDict.lammpstrj_items not in control_dict:
+        control_dict[MG.ControlDict.lammpstrj_items] = [
+            MG.LammpstrjItem.timestep, MG.LammpstrjItem.time, MG.LammpstrjItem.number_atoms, MG.LammpstrjItem.bounds,
+            MG.LammpstrjItem.atoms
+        ]
         print("[default properties set] ", end="")
-    print(" ".join(control_dict["items"]))
+    print(" ".join([str(item.name) for item in control_dict[MG.ControlDict.lammpstrj_items]]))
 
     print("Writing header.")
-    if "timestep" in control_dict["items"]:
+    if MG.LammpstrjItem.timestep in control_dict[MG.ControlDict.lammpstrj_items]:
         file.write(
             "ITEM: TIMESTEP\n"
             "" + str(system.timestep) + "\n"
         )
-    if "time" in control_dict["items"]:
+    if MG.LammpstrjItem.time in control_dict[MG.ControlDict.lammpstrj_items]:
         file.write(
             "ITEM: TIME\n"
             "" + str(system.time) + "\n"
         )
-    if "number_atoms" in control_dict["items"]:
+    if MG.LammpstrjItem.number_atoms in control_dict[MG.ControlDict.lammpstrj_items]:
         file.write(
             "ITEM: NUMBER OF ATOMS\n"
             "" + str(system.number) + "\n"
         )
-    if "bounds" in control_dict["items"]:
+    if MG.LammpstrjItem.bounds in control_dict[MG.ControlDict.lammpstrj_items]:
         file.write(
             "ITEM: BOX BOUNDS " + str(system.bounds["xlo"][0]) + str(system.bounds["xhi"][0]) + " " +
                 str(system.bounds["ylo"][0]) + str(system.bounds["yhi"][0]) + " " + str(system.bounds["zlo"][0]) +
@@ -93,24 +100,28 @@ def saveLammpsFile(system, file, control_dict):
             "" + str(system.bounds["ylo"][1]) + " " + str(system.bounds["yhi"][1]) + "\n"
             "" + str(system.bounds["zlo"][1]) + " " + str(system.bounds["zhi"][1]) + "\n"
         )
-    if "atoms" in control_dict["items"]:
+    if MG.LammpstrjItem.atoms in control_dict[MG.ControlDict.lammpstrj_items]:
         print("Writing atoms using following properties: ", end="")
-        if "properties" not in control_dict:
-            control_dict["properties"] = ["id", "element", "type", "x", "y", "z", "charge", "mass", "vx", "vy", "vz",
-                                          "kinetic_energy", "potential_energy"]
+        if MG.ControlDict.lammpstrj_properties not in control_dict:
+            control_dict[MG.ControlDict.lammpstrj_properties] = [
+                MG.LammpstrjProp.id, MG.LammpstrjProp.element, MG.LammpstrjProp.type, MG.LammpstrjProp.x,
+                MG.LammpstrjProp.y, MG.LammpstrjProp.z, MG.LammpstrjProp.charge, MG.LammpstrjProp.mass,
+                MG.LammpstrjProp.vx, MG.LammpstrjProp.vy, MG.LammpstrjProp.vz, MG.LammpstrjProp.kinetic_energy,
+                MG.LammpstrjProp.potential_energy
+            ]
             print("[default properties set] ", end="")
-        else:
-            properties_keys = control_dict["properties"]
-            properties_str = control_dict["properties"]
 
-        if "charge" in properties_str:
-            temp_index = properties_str.index("charge")
+        properties_keys = [str(key.name) for key in control_dict[MG.ControlDict.lammpstrj_properties]]
+        properties_str = [str(key.name) for key in control_dict[MG.ControlDict.lammpstrj_properties]]
+
+        if str(MG.LammpstrjProp.charge.name) in properties_str:
+            temp_index = properties_str.index(str(MG.LammpstrjProp.charge.name))
             properties_str[temp_index] = "q"
-        if "kinetic_energy" in properties_str:
-            temp_index = properties_str.index("kinetic_energy")
+        if str(MG.LammpstrjProp.kinetic_energy.name) in properties_str:
+            temp_index = properties_str.index(str(MG.LammpstrjProp.kinetic_energy.name))
             properties_str[temp_index] = "c_sput_ke"
-        if "potential_energy" in properties_str:
-            temp_index = properties_str.index("potential_energy")
+        if str(MG.LammpstrjProp.potential_energy.name) in properties_str:
+            temp_index = properties_str.index(str(MG.LammpstrjProp.potential_energy.name))
             properties_str[temp_index] = "c_sput_pe"
         properties_str = " ".join(properties_str)
         print(properties_str)
@@ -122,36 +133,36 @@ def saveLammpsFile(system, file, control_dict):
         for i, atom in enumerate(system.atoms):
             temp_properties = []
             for key in properties_keys:
-                if key == "id":
+                if key == MG.LammpstrjProp.id:
                     property_value = atom.id
-                elif key == "element":
+                elif key == MG.LammpstrjProp.element:
                     property_value = atom.name
-                elif key == "name":
+                elif key == MG.LammpstrjProp.name:
                     property_value = atom.name
-                elif key == "type":
+                elif key == MG.LammpstrjProp.type:
                     property_value = atom.type
-                elif key == "x":
+                elif key == MG.LammpstrjProp.x:
                     property_value = atom.coords[0]
-                elif key == "y":
+                elif key == MG.LammpstrjProp.y:
                     property_value = atom.coords[1]
-                elif key == "z":
+                elif key == MG.LammpstrjProp.z:
                     property_value = atom.coords[2]
-                elif key == "q":
+                elif key == MG.LammpstrjProp.q:
                     property_value = atom.charge
-                elif key == "mass":
+                elif key == MG.LammpstrjProp.mass:
                     property_value = atom.mass
-                elif key == "vx":
+                elif key == MG.LammpstrjProp.vx:
                     property_value = atom.velocity[0]
-                elif key == "vy":
+                elif key == MG.LammpstrjProp.vy:
                     property_value = atom.velocity[1]
-                elif key == "vz":
+                elif key == MG.LammpstrjProp.vz:
                     property_value = atom.velocity[2]
-                elif key == "kinetic_energy":
+                elif key == MG.LammpstrjProp.kinetic_energy:
                     property_value = atom.energy["kinetic"]
-                elif key == 'potential_energy':
+                elif key == MG.LammpstrjProp.potential_energy:
                     property_value = atom.energy["potential"]
                 else:
-                    raise NotImplementedError("Property " + key + "not implemented in file save.")
+                    raise NotImplementedError("Property " + str(key) + "not implemented in file save.")
                 temp_properties.append(str(property_value))
             file.write(" ".join(temp_properties) + "\n")
             if i % modulo == 0:
