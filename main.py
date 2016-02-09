@@ -1,19 +1,32 @@
 import MGSimHelps
 
+testing = True
+
+path = "test/"
+
 system = MGSimHelps.AtomsSystem()
 # system.readFile("test/water_lammps.dat", "lammps_data", {"lammps_data_type": "charge"})
 system.readFile(
-        "test/5keV.lammpstrj",
-        MGSimHelps.FileType.auto
+        path + "5keV.lammpstrj",
+        MGSimHelps.FileType.lammpstrj
 )
 print(system)
 
-system.recalculateBounds()
+if testing:
+    system.recalculateBounds()
 
-system.saveFile(
-        "test/system.dat",
-        MGSimHelps.FileType.lammps_data,
-        {MGSimHelps.ControlDict.lammps_data_style: MGSimHelps.LammpsDataStyle.charge}
-)
+    # system.recalculateIDs()
+
+    system.doBinning()
+
+    system.doCloseNeighbours("test/neighbours.dat")
+
+    # system.findMolecules()
+else:
+    system.saveSystem(
+            path + "system.dat",
+            MGSimHelps.FileType.lammps_data,
+            {MGSimHelps.ControlDict.lammps_data_style: MGSimHelps.LammpsDataStyle.charge}
+    )
 
 print("Finished.")
