@@ -1,4 +1,5 @@
 import MGSimHelps
+import cProfile
 
 testing = True
 
@@ -17,11 +18,11 @@ if testing:
 
     # system.recalculateIDs()
 
-    system.doBinning()
+    # system.doBinning()
 
-    system.doCloseNeighbours("test/neighbours.dat")
+    system.doCloseNeighbours()
 
-    # system.findMolecules()
+    cProfile.run('system.findBonds()')
 else:
     system.saveSystem(
             path + "system.dat",
