@@ -1,4 +1,4 @@
-import MGSimHelps
+import MGSimHelps as MG
 
 
 def readLammpsFile(system, file):  # TODO Implement additional information that can be found in file
@@ -77,7 +77,7 @@ def readLammpsFile(system, file):  # TODO Implement additional information that 
                     temp_coords[1] = float(temp_dict["y"])
                 if "z" in temp_dict:
                     temp_coords[2] = float(temp_dict["z"])
-                atom = MGSimHelps.Atom(tuple(temp_coords))
+                atom = MG.Atom(tuple(temp_coords))
                 if "id" in temp_dict:
                     atom.id = int(temp_dict["id"])
                 if "type" in temp_dict:
@@ -121,10 +121,10 @@ def readLammpsDataFile(system, file, control_dict):
     """
     print("Reading LAMMPS Data file using style ", end="")
     atoms_flag = False
-    if "lammps_data_type" not in control_dict:
-        raise NameError("Please provide the data type for LAMMPS data file.")
-    print(control_dict["lammps_data_type"])
-    if control_dict["lammps_data_type"] == "charge":
+    if control_dict[MG.ControlDict.lammps_data_style] not in control_dict:
+        raise NameError("Please provide the data style for LAMMPS data file.")
+    print(control_dict[MG.ControlDict.lammps_data_style].name)
+    if control_dict[MG.ControlDict.lammps_data_style] == MG.LammpsDataStyle.charge:
         print("Reading header.")
         for line in file:
             content = line.strip().split()
@@ -148,7 +148,7 @@ def readLammpsDataFile(system, file, control_dict):
             else:
                 if atoms_flag and len(content) > 1:
                     counter += 1
-                    atom = MGSimHelps.Atom((float(content[3]), float(content[4]), float(content[5])))
+                    atom = MG.Atom((float(content[3]), float(content[4]), float(content[5])))
                     atom.id = int(content[0])
                     atom.type = int(content[1])
                     atom.charge = float(content[2])
@@ -156,4 +156,5 @@ def readLammpsDataFile(system, file, control_dict):
                     if counter % 10000 == 0:
                         print("Read " + str(counter) + " atoms.")
     else:
-        raise NotImplementedError("Data type " + control_dict["lammps_data_type"] + " is not implemented.")
+        raise NotImplementedError("Data type " + control_dict[MG.ControlDict.lammps_data_style] +
+                                  " is not implemented.")
