@@ -19,9 +19,11 @@ if testing:
     # system.recalculateIDs()
 
     # system.doBinning()
+#    cProfile.run("system.doBinning()")
 
     system.doCloseNeighbours()
-
+#    cProfile.run("system.doCloseNeighbours()")
+#    system.findBonds()
     cProfile.run('system.findBonds()')
 else:
     system.saveSystem(

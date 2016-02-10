@@ -102,7 +102,7 @@ class Atom:
         self.energy = {"kinetic": 0.0, "potential": 0.0}
         self.neighbours = []
         self.bin = None
-        self.bonds = []
+        self.bonds = set()
 
     def __str__(self):
         return "Atom ID " + str(self.id) + ", type " + str(self.type) + ", name " + self.name + \
@@ -339,32 +339,33 @@ class AtomsSystem:  # TODO: change tuples to lists
         deltax = self.bounds["xhi"][1] - self.bounds["xlo"][1]
         deltay = self.bounds["yhi"][1] - self.bounds["ylo"][1]
         deltaz = self.bounds["zhi"][1] - self.bounds["zlo"][1]
-        dx = deltax / 100
-        dy = deltay / 100
-        dz = deltaz / 100
+        dx = deltax / 1000
+        dy = deltay / 1000
+        dz = deltaz / 1000
         if dx > 100:
             dx = 100
-        if dx < 10:
-            dx = 10
+        if dx < 3:
+            dx = 3
         if dy > 100:
             dy = 100
-        if dy < 10:
-            dy = 10
+        if dy < 3:
+            dy = 3
         if dz > 100:
             dz = 100
-        if dz < 10:
-            dz = 10
-        self.bins = [[[[]]*math.ceil(deltaz / dz) for y in range(math.ceil(deltay / dy))]
-                     for x in range(math.ceil(deltay / dy))]  # TODO: change to array or sth more efficient?
+        if dz < 3:
+            dz = 3
+
+        self.bins = [[[np.array([], dtype=np.int_)]*math.ceil(deltaz / dz) for y in range(math.ceil(deltay / dy))]
+                     for x in range(math.ceil(deltax / dx))]
         print("Created " + str(math.ceil(deltaz / dz)) + " x " + str(math.ceil(deltay / dy)) + " x " +
-              str(math.ceil(deltay / dy)) + "bins.")
+              str(math.ceil(deltay / dy)) + " bins.")
         modulo = round(self.number / 10)
         for i, atom in enumerate(self.atoms):
             binx = math.floor((atom.coords[0] - self.bounds["xlo"][1]) / dx)
             biny = math.floor((atom.coords[1] - self.bounds["ylo"][1]) / dy)
             binz = math.floor((atom.coords[2] - self.bounds["zlo"][1]) / dz)
             atom.bin = [binx, biny, binz]
-            self.bins[binx][biny][binz].append(i)
+            self.bins[binx][biny][binz] = np.append(self.bins[binx][biny][binz], i)
             if i % modulo == 0:
                 print("Binned " + str(i) + " out of " + str(self.number) + " atoms.")
 
@@ -380,287 +381,288 @@ class AtomsSystem:  # TODO: change tuples to lists
             x = atom.bin[0]
             y = atom.bin[1]
             z = atom.bin[2]
-            atom.neighbours = [neigh for neigh in self.bins[x][y][z] if neigh != atomCounter]
+            big_bin = [neigh for neigh in self.bins[x][y][z] if neigh != atomCounter]
             if 0 < x < xmax:
-                atom.neighbours.extend(self.bins[x-1][y][z])
-                atom.neighbours.extend(self.bins[x+1][y][z])
+                big_bin.extend(self.bins[x-1][y][z])
+                big_bin.extend(self.bins[x+1][y][z])
                 if 0 < y < ymax:
-                    atom.neighbours.extend(self.bins[x][y-1][z])
-                    atom.neighbours.extend(self.bins[x][y+1][z])
-                    atom.neighbours.extend(self.bins[x-1][y-1][z])
-                    atom.neighbours.extend(self.bins[x+1][y-1][z])
-                    atom.neighbours.extend(self.bins[x-1][y+1][z])
-                    atom.neighbours.extend(self.bins[x+1][y+1][z])
+                    big_bin.extend(self.bins[x][y-1][z])
+                    big_bin.extend(self.bins[x][y+1][z])
+                    big_bin.extend(self.bins[x-1][y-1][z])
+                    big_bin.extend(self.bins[x+1][y-1][z])
+                    big_bin.extend(self.bins[x-1][y+1][z])
+                    big_bin.extend(self.bins[x+1][y+1][z])
                     if 0 < z < zmax:
-                        atom.neighbours.extend(self.bins[x][y][z-1])
-                        atom.neighbours.extend(self.bins[x][y][z+1])
-                        atom.neighbours.extend(self.bins[x-1][y][z-1])
-                        atom.neighbours.extend(self.bins[x+1][y][z-1])
-                        atom.neighbours.extend(self.bins[x-1][y][z+1])
-                        atom.neighbours.extend(self.bins[x+1][y][z+1])
-                        atom.neighbours.extend(self.bins[x][y-1][z-1])
-                        atom.neighbours.extend(self.bins[x][y+1][z-1])
-                        atom.neighbours.extend(self.bins[x-1][y-1][z-1])
-                        atom.neighbours.extend(self.bins[x+1][y-1][z-1])
-                        atom.neighbours.extend(self.bins[x-1][y+1][z-1])
-                        atom.neighbours.extend(self.bins[x+1][y+1][z-1])
-                        atom.neighbours.extend(self.bins[x][y-1][z+1])
-                        atom.neighbours.extend(self.bins[x][y+1][z+1])
-                        atom.neighbours.extend(self.bins[x-1][y-1][z+1])
-                        atom.neighbours.extend(self.bins[x+1][y-1][z+1])
-                        atom.neighbours.extend(self.bins[x-1][y+1][z+1])
-                        atom.neighbours.extend(self.bins[x+1][y+1][z+1])
+                        big_bin.extend(self.bins[x][y][z-1])
+                        big_bin.extend(self.bins[x][y][z+1])
+                        big_bin.extend(self.bins[x-1][y][z-1])
+                        big_bin.extend(self.bins[x+1][y][z-1])
+                        big_bin.extend(self.bins[x-1][y][z+1])
+                        big_bin.extend(self.bins[x+1][y][z+1])
+                        big_bin.extend(self.bins[x][y-1][z-1])
+                        big_bin.extend(self.bins[x][y+1][z-1])
+                        big_bin.extend(self.bins[x-1][y-1][z-1])
+                        big_bin.extend(self.bins[x+1][y-1][z-1])
+                        big_bin.extend(self.bins[x-1][y+1][z-1])
+                        big_bin.extend(self.bins[x+1][y+1][z-1])
+                        big_bin.extend(self.bins[x][y-1][z+1])
+                        big_bin.extend(self.bins[x][y+1][z+1])
+                        big_bin.extend(self.bins[x-1][y-1][z+1])
+                        big_bin.extend(self.bins[x+1][y-1][z+1])
+                        big_bin.extend(self.bins[x-1][y+1][z+1])
+                        big_bin.extend(self.bins[x+1][y+1][z+1])
                     else:
                         if z > 0:
-                            atom.neighbours.extend(self.bins[x][y][z-1])
-                            atom.neighbours.extend(self.bins[x-1][y][z-1])
-                            atom.neighbours.extend(self.bins[x+1][y][z-1])
-                            atom.neighbours.extend(self.bins[x][y-1][z-1])
-                            atom.neighbours.extend(self.bins[x][y+1][z-1])
-                            atom.neighbours.extend(self.bins[x-1][y-1][z-1])
-                            atom.neighbours.extend(self.bins[x+1][y-1][z-1])
-                            atom.neighbours.extend(self.bins[x-1][y+1][z-1])
-                            atom.neighbours.extend(self.bins[x+1][y+1][z-1])
+                            big_bin.extend(self.bins[x][y][z-1])
+                            big_bin.extend(self.bins[x-1][y][z-1])
+                            big_bin.extend(self.bins[x+1][y][z-1])
+                            big_bin.extend(self.bins[x][y-1][z-1])
+                            big_bin.extend(self.bins[x][y+1][z-1])
+                            big_bin.extend(self.bins[x-1][y-1][z-1])
+                            big_bin.extend(self.bins[x+1][y-1][z-1])
+                            big_bin.extend(self.bins[x-1][y+1][z-1])
+                            big_bin.extend(self.bins[x+1][y+1][z-1])
                         if z < zmax:
-                            atom.neighbours.extend(self.bins[x][y][z+1])
-                            atom.neighbours.extend(self.bins[x-1][y][z+1])
-                            atom.neighbours.extend(self.bins[x+1][y][z+1])
-                            atom.neighbours.extend(self.bins[x][y-1][z+1])
-                            atom.neighbours.extend(self.bins[x][y+1][z+1])
-                            atom.neighbours.extend(self.bins[x-1][y-1][z+1])
-                            atom.neighbours.extend(self.bins[x+1][y-1][z+1])
-                            atom.neighbours.extend(self.bins[x-1][y+1][z+1])
-                            atom.neighbours.extend(self.bins[x+1][y+1][z+1])
+                            big_bin.extend(self.bins[x][y][z+1])
+                            big_bin.extend(self.bins[x-1][y][z+1])
+                            big_bin.extend(self.bins[x+1][y][z+1])
+                            big_bin.extend(self.bins[x][y-1][z+1])
+                            big_bin.extend(self.bins[x][y+1][z+1])
+                            big_bin.extend(self.bins[x-1][y-1][z+1])
+                            big_bin.extend(self.bins[x+1][y-1][z+1])
+                            big_bin.extend(self.bins[x-1][y+1][z+1])
+                            big_bin.extend(self.bins[x+1][y+1][z+1])
                 else:
                     if y > 0:
-                        atom.neighbours.extend(self.bins[x][y-1][z])
-                        atom.neighbours.extend(self.bins[x-1][y-1][z])
-                        atom.neighbours.extend(self.bins[x+1][y-1][z])
+                        big_bin.extend(self.bins[x][y-1][z])
+                        big_bin.extend(self.bins[x-1][y-1][z])
+                        big_bin.extend(self.bins[x+1][y-1][z])
                         if 0 < z < zmax:
-                            atom.neighbours.extend(self.bins[x][y][z-1])
-                            atom.neighbours.extend(self.bins[x][y][z+1])
-                            atom.neighbours.extend(self.bins[x-1][y][z-1])
-                            atom.neighbours.extend(self.bins[x+1][y][z-1])
-                            atom.neighbours.extend(self.bins[x-1][y][z+1])
-                            atom.neighbours.extend(self.bins[x+1][y][z+1])
-                            atom.neighbours.extend(self.bins[x][y-1][z-1])
-                            atom.neighbours.extend(self.bins[x-1][y-1][z-1])
-                            atom.neighbours.extend(self.bins[x+1][y-1][z-1])
-                            atom.neighbours.extend(self.bins[x][y-1][z+1])
-                            atom.neighbours.extend(self.bins[x-1][y-1][z+1])
-                            atom.neighbours.extend(self.bins[x+1][y-1][z+1])
+                            big_bin.extend(self.bins[x][y][z-1])
+                            big_bin.extend(self.bins[x][y][z+1])
+                            big_bin.extend(self.bins[x-1][y][z-1])
+                            big_bin.extend(self.bins[x+1][y][z-1])
+                            big_bin.extend(self.bins[x-1][y][z+1])
+                            big_bin.extend(self.bins[x+1][y][z+1])
+                            big_bin.extend(self.bins[x][y-1][z-1])
+                            big_bin.extend(self.bins[x-1][y-1][z-1])
+                            big_bin.extend(self.bins[x+1][y-1][z-1])
+                            big_bin.extend(self.bins[x][y-1][z+1])
+                            big_bin.extend(self.bins[x-1][y-1][z+1])
+                            big_bin.extend(self.bins[x+1][y-1][z+1])
                         else:
                             if z > 0:
-                                atom.neighbours.extend(self.bins[x][y][z-1])
-                                atom.neighbours.extend(self.bins[x-1][y][z-1])
-                                atom.neighbours.extend(self.bins[x+1][y][z-1])
-                                atom.neighbours.extend(self.bins[x][y-1][z-1])
-                                atom.neighbours.extend(self.bins[x-1][y-1][z-1])
-                                atom.neighbours.extend(self.bins[x+1][y-1][z-1])
+                                big_bin.extend(self.bins[x][y][z-1])
+                                big_bin.extend(self.bins[x-1][y][z-1])
+                                big_bin.extend(self.bins[x+1][y][z-1])
+                                big_bin.extend(self.bins[x][y-1][z-1])
+                                big_bin.extend(self.bins[x-1][y-1][z-1])
+                                big_bin.extend(self.bins[x+1][y-1][z-1])
                             if z < zmax:
-                                atom.neighbours.extend(self.bins[x][y][z+1])
-                                atom.neighbours.extend(self.bins[x-1][y][z+1])
-                                atom.neighbours.extend(self.bins[x+1][y][z+1])
-                                atom.neighbours.extend(self.bins[x][y-1][z+1])
-                                atom.neighbours.extend(self.bins[x-1][y-1][z+1])
-                                atom.neighbours.extend(self.bins[x+1][y-1][z+1])
+                                big_bin.extend(self.bins[x][y][z+1])
+                                big_bin.extend(self.bins[x-1][y][z+1])
+                                big_bin.extend(self.bins[x+1][y][z+1])
+                                big_bin.extend(self.bins[x][y-1][z+1])
+                                big_bin.extend(self.bins[x-1][y-1][z+1])
+                                big_bin.extend(self.bins[x+1][y-1][z+1])
                     if y < ymax:
-                        atom.neighbours.extend(self.bins[x][y+1][z])
-                        atom.neighbours.extend(self.bins[x-1][y+1][z])
-                        atom.neighbours.extend(self.bins[x+1][y+1][z])
+                        big_bin.extend(self.bins[x][y+1][z])
+                        big_bin.extend(self.bins[x-1][y+1][z])
+                        big_bin.extend(self.bins[x+1][y+1][z])
                         if 0 < z < zmax:
-                            atom.neighbours.extend(self.bins[x][y][z-1])
-                            atom.neighbours.extend(self.bins[x][y][z+1])
-                            atom.neighbours.extend(self.bins[x-1][y][z-1])
-                            atom.neighbours.extend(self.bins[x+1][y][z-1])
-                            atom.neighbours.extend(self.bins[x-1][y][z+1])
-                            atom.neighbours.extend(self.bins[x+1][y][z+1])
-                            atom.neighbours.extend(self.bins[x][y+1][z-1])
-                            atom.neighbours.extend(self.bins[x-1][y+1][z-1])
-                            atom.neighbours.extend(self.bins[x+1][y+1][z-1])
-                            atom.neighbours.extend(self.bins[x][y+1][z+1])
-                            atom.neighbours.extend(self.bins[x-1][y+1][z+1])
-                            atom.neighbours.extend(self.bins[x+1][y+1][z+1])
+                            big_bin.extend(self.bins[x][y][z-1])
+                            big_bin.extend(self.bins[x][y][z+1])
+                            big_bin.extend(self.bins[x-1][y][z-1])
+                            big_bin.extend(self.bins[x+1][y][z-1])
+                            big_bin.extend(self.bins[x-1][y][z+1])
+                            big_bin.extend(self.bins[x+1][y][z+1])
+                            big_bin.extend(self.bins[x][y+1][z-1])
+                            big_bin.extend(self.bins[x-1][y+1][z-1])
+                            big_bin.extend(self.bins[x+1][y+1][z-1])
+                            big_bin.extend(self.bins[x][y+1][z+1])
+                            big_bin.extend(self.bins[x-1][y+1][z+1])
+                            big_bin.extend(self.bins[x+1][y+1][z+1])
                         else:
                             if z > 0:
-                                atom.neighbours.extend(self.bins[x][y][z-1])
-                                atom.neighbours.extend(self.bins[x-1][y][z-1])
-                                atom.neighbours.extend(self.bins[x+1][y][z-1])
-                                atom.neighbours.extend(self.bins[x][y+1][z-1])
-                                atom.neighbours.extend(self.bins[x-1][y+1][z-1])
-                                atom.neighbours.extend(self.bins[x+1][y+1][z-1])
+                                big_bin.extend(self.bins[x][y][z-1])
+                                big_bin.extend(self.bins[x-1][y][z-1])
+                                big_bin.extend(self.bins[x+1][y][z-1])
+                                big_bin.extend(self.bins[x][y+1][z-1])
+                                big_bin.extend(self.bins[x-1][y+1][z-1])
+                                big_bin.extend(self.bins[x+1][y+1][z-1])
                             if z < zmax:
-                                atom.neighbours.extend(self.bins[x][y][z+1])
-                                atom.neighbours.extend(self.bins[x-1][y][z+1])
-                                atom.neighbours.extend(self.bins[x+1][y][z+1])
-                                atom.neighbours.extend(self.bins[x][y+1][z+1])
-                                atom.neighbours.extend(self.bins[x-1][y+1][z+1])
-                                atom.neighbours.extend(self.bins[x+1][y+1][z+1])
+                                big_bin.extend(self.bins[x][y][z+1])
+                                big_bin.extend(self.bins[x-1][y][z+1])
+                                big_bin.extend(self.bins[x+1][y][z+1])
+                                big_bin.extend(self.bins[x][y+1][z+1])
+                                big_bin.extend(self.bins[x-1][y+1][z+1])
+                                big_bin.extend(self.bins[x+1][y+1][z+1])
             else:
                 if x > 0:
-                    atom.neighbours.extend(self.bins[x-1][y][z])
+                    big_bin.extend(self.bins[x-1][y][z])
                     if 0 < y < ymax:
-                        atom.neighbours.extend(self.bins[x][y-1][z])
-                        atom.neighbours.extend(self.bins[x][y+1][z])
-                        atom.neighbours.extend(self.bins[x-1][y-1][z])
-                        atom.neighbours.extend(self.bins[x-1][y+1][z])
+                        big_bin.extend(self.bins[x][y-1][z])
+                        big_bin.extend(self.bins[x][y+1][z])
+                        big_bin.extend(self.bins[x-1][y-1][z])
+                        big_bin.extend(self.bins[x-1][y+1][z])
                         if 0 < z < zmax:
-                            atom.neighbours.extend(self.bins[x][y][z-1])
-                            atom.neighbours.extend(self.bins[x][y][z+1])
-                            atom.neighbours.extend(self.bins[x-1][y][z-1])
-                            atom.neighbours.extend(self.bins[x-1][y][z+1])
-                            atom.neighbours.extend(self.bins[x][y-1][z-1])
-                            atom.neighbours.extend(self.bins[x][y+1][z-1])
-                            atom.neighbours.extend(self.bins[x-1][y-1][z-1])
-                            atom.neighbours.extend(self.bins[x-1][y+1][z-1])
-                            atom.neighbours.extend(self.bins[x][y-1][z+1])
-                            atom.neighbours.extend(self.bins[x][y+1][z+1])
-                            atom.neighbours.extend(self.bins[x-1][y-1][z+1])
-                            atom.neighbours.extend(self.bins[x-1][y+1][z+1])
+                            big_bin.extend(self.bins[x][y][z-1])
+                            big_bin.extend(self.bins[x][y][z+1])
+                            big_bin.extend(self.bins[x-1][y][z-1])
+                            big_bin.extend(self.bins[x-1][y][z+1])
+                            big_bin.extend(self.bins[x][y-1][z-1])
+                            big_bin.extend(self.bins[x][y+1][z-1])
+                            big_bin.extend(self.bins[x-1][y-1][z-1])
+                            big_bin.extend(self.bins[x-1][y+1][z-1])
+                            big_bin.extend(self.bins[x][y-1][z+1])
+                            big_bin.extend(self.bins[x][y+1][z+1])
+                            big_bin.extend(self.bins[x-1][y-1][z+1])
+                            big_bin.extend(self.bins[x-1][y+1][z+1])
                         else:
                             if z > 0:
-                                atom.neighbours.extend(self.bins[x][y][z-1])
-                                atom.neighbours.extend(self.bins[x-1][y][z-1])
-                                atom.neighbours.extend(self.bins[x][y-1][z-1])
-                                atom.neighbours.extend(self.bins[x][y+1][z-1])
-                                atom.neighbours.extend(self.bins[x-1][y-1][z-1])
-                                atom.neighbours.extend(self.bins[x-1][y+1][z-1])
+                                big_bin.extend(self.bins[x][y][z-1])
+                                big_bin.extend(self.bins[x-1][y][z-1])
+                                big_bin.extend(self.bins[x][y-1][z-1])
+                                big_bin.extend(self.bins[x][y+1][z-1])
+                                big_bin.extend(self.bins[x-1][y-1][z-1])
+                                big_bin.extend(self.bins[x-1][y+1][z-1])
                             if z < zmax:
-                                atom.neighbours.extend(self.bins[x][y][z+1])
-                                atom.neighbours.extend(self.bins[x-1][y][z+1])
-                                atom.neighbours.extend(self.bins[x][y-1][z+1])
-                                atom.neighbours.extend(self.bins[x][y+1][z+1])
-                                atom.neighbours.extend(self.bins[x-1][y-1][z+1])
-                                atom.neighbours.extend(self.bins[x-1][y+1][z+1])
+                                big_bin.extend(self.bins[x][y][z+1])
+                                big_bin.extend(self.bins[x-1][y][z+1])
+                                big_bin.extend(self.bins[x][y-1][z+1])
+                                big_bin.extend(self.bins[x][y+1][z+1])
+                                big_bin.extend(self.bins[x-1][y-1][z+1])
+                                big_bin.extend(self.bins[x-1][y+1][z+1])
                     else:
                         if y > 0:
-                            atom.neighbours.extend(self.bins[x][y-1][z])
-                            atom.neighbours.extend(self.bins[x-1][y-1][z])
+                            big_bin.extend(self.bins[x][y-1][z])
+                            big_bin.extend(self.bins[x-1][y-1][z])
                             if 0 < z < zmax:
-                                atom.neighbours.extend(self.bins[x][y][z-1])
-                                atom.neighbours.extend(self.bins[x][y][z+1])
-                                atom.neighbours.extend(self.bins[x-1][y][z-1])
-                                atom.neighbours.extend(self.bins[x-1][y][z+1])
-                                atom.neighbours.extend(self.bins[x][y-1][z-1])
-                                atom.neighbours.extend(self.bins[x-1][y-1][z-1])
-                                atom.neighbours.extend(self.bins[x][y-1][z+1])
-                                atom.neighbours.extend(self.bins[x-1][y-1][z+1])
+                                big_bin.extend(self.bins[x][y][z-1])
+                                big_bin.extend(self.bins[x][y][z+1])
+                                big_bin.extend(self.bins[x-1][y][z-1])
+                                big_bin.extend(self.bins[x-1][y][z+1])
+                                big_bin.extend(self.bins[x][y-1][z-1])
+                                big_bin.extend(self.bins[x-1][y-1][z-1])
+                                big_bin.extend(self.bins[x][y-1][z+1])
+                                big_bin.extend(self.bins[x-1][y-1][z+1])
                             else:
                                 if z > 0:
-                                    atom.neighbours.extend(self.bins[x][y][z-1])
-                                    atom.neighbours.extend(self.bins[x-1][y][z-1])
-                                    atom.neighbours.extend(self.bins[x][y-1][z-1])
-                                    atom.neighbours.extend(self.bins[x-1][y-1][z-1])
+                                    big_bin.extend(self.bins[x][y][z-1])
+                                    big_bin.extend(self.bins[x-1][y][z-1])
+                                    big_bin.extend(self.bins[x][y-1][z-1])
+                                    big_bin.extend(self.bins[x-1][y-1][z-1])
                                 if z < zmax:
-                                    atom.neighbours.extend(self.bins[x][y][z+1])
-                                    atom.neighbours.extend(self.bins[x-1][y][z+1])
-                                    atom.neighbours.extend(self.bins[x][y-1][z+1])
-                                    atom.neighbours.extend(self.bins[x-1][y-1][z+1])
+                                    big_bin.extend(self.bins[x][y][z+1])
+                                    big_bin.extend(self.bins[x-1][y][z+1])
+                                    big_bin.extend(self.bins[x][y-1][z+1])
+                                    big_bin.extend(self.bins[x-1][y-1][z+1])
                         if y < ymax:
-                            atom.neighbours.extend(self.bins[x][y+1][z])
-                            atom.neighbours.extend(self.bins[x-1][y+1][z])
+                            big_bin.extend(self.bins[x][y+1][z])
+                            big_bin.extend(self.bins[x-1][y+1][z])
                             if 0 < z < zmax:
-                                atom.neighbours.extend(self.bins[x][y][z-1])
-                                atom.neighbours.extend(self.bins[x][y][z+1])
-                                atom.neighbours.extend(self.bins[x-1][y][z-1])
-                                atom.neighbours.extend(self.bins[x-1][y][z+1])
-                                atom.neighbours.extend(self.bins[x][y+1][z-1])
-                                atom.neighbours.extend(self.bins[x-1][y+1][z-1])
-                                atom.neighbours.extend(self.bins[x][y+1][z+1])
-                                atom.neighbours.extend(self.bins[x-1][y+1][z+1])
+                                big_bin.extend(self.bins[x][y][z-1])
+                                big_bin.extend(self.bins[x][y][z+1])
+                                big_bin.extend(self.bins[x-1][y][z-1])
+                                big_bin.extend(self.bins[x-1][y][z+1])
+                                big_bin.extend(self.bins[x][y+1][z-1])
+                                big_bin.extend(self.bins[x-1][y+1][z-1])
+                                big_bin.extend(self.bins[x][y+1][z+1])
+                                big_bin.extend(self.bins[x-1][y+1][z+1])
                             else:
                                 if z > 0:
-                                    atom.neighbours.extend(self.bins[x][y][z-1])
-                                    atom.neighbours.extend(self.bins[x-1][y][z-1])
-                                    atom.neighbours.extend(self.bins[x][y+1][z-1])
-                                    atom.neighbours.extend(self.bins[x-1][y+1][z-1])
+                                    big_bin.extend(self.bins[x][y][z-1])
+                                    big_bin.extend(self.bins[x-1][y][z-1])
+                                    big_bin.extend(self.bins[x][y+1][z-1])
+                                    big_bin.extend(self.bins[x-1][y+1][z-1])
                                 if z < zmax:
-                                    atom.neighbours.extend(self.bins[x][y][z+1])
-                                    atom.neighbours.extend(self.bins[x-1][y][z+1])
-                                    atom.neighbours.extend(self.bins[x][y+1][z+1])
-                                    atom.neighbours.extend(self.bins[x-1][y+1][z+1])
+                                    big_bin.extend(self.bins[x][y][z+1])
+                                    big_bin.extend(self.bins[x-1][y][z+1])
+                                    big_bin.extend(self.bins[x][y+1][z+1])
+                                    big_bin.extend(self.bins[x-1][y+1][z+1])
                 if x < xmax:
-                    atom.neighbours.extend(self.bins[x+1][y][z])
+                    big_bin.extend(self.bins[x+1][y][z])
                     if 0 < y < ymax:
-                        atom.neighbours.extend(self.bins[x][y-1][z])
-                        atom.neighbours.extend(self.bins[x][y+1][z])
-                        atom.neighbours.extend(self.bins[x+1][y-1][z])
-                        atom.neighbours.extend(self.bins[x+1][y+1][z])
+                        big_bin.extend(self.bins[x][y-1][z])
+                        big_bin.extend(self.bins[x][y+1][z])
+                        big_bin.extend(self.bins[x+1][y-1][z])
+                        big_bin.extend(self.bins[x+1][y+1][z])
                         if 0 < z < zmax:
-                            atom.neighbours.extend(self.bins[x][y][z-1])
-                            atom.neighbours.extend(self.bins[x][y][z+1])
-                            atom.neighbours.extend(self.bins[x+1][y][z-1])
-                            atom.neighbours.extend(self.bins[x+1][y][z+1])
-                            atom.neighbours.extend(self.bins[x][y-1][z-1])
-                            atom.neighbours.extend(self.bins[x][y+1][z-1])
-                            atom.neighbours.extend(self.bins[x+1][y-1][z-1])
-                            atom.neighbours.extend(self.bins[x+1][y+1][z-1])
-                            atom.neighbours.extend(self.bins[x][y-1][z+1])
-                            atom.neighbours.extend(self.bins[x][y+1][z+1])
-                            atom.neighbours.extend(self.bins[x+1][y-1][z+1])
-                            atom.neighbours.extend(self.bins[x+1][y+1][z+1])
+                            big_bin.extend(self.bins[x][y][z-1])
+                            big_bin.extend(self.bins[x][y][z+1])
+                            big_bin.extend(self.bins[x+1][y][z-1])
+                            big_bin.extend(self.bins[x+1][y][z+1])
+                            big_bin.extend(self.bins[x][y-1][z-1])
+                            big_bin.extend(self.bins[x][y+1][z-1])
+                            big_bin.extend(self.bins[x+1][y-1][z-1])
+                            big_bin.extend(self.bins[x+1][y+1][z-1])
+                            big_bin.extend(self.bins[x][y-1][z+1])
+                            big_bin.extend(self.bins[x][y+1][z+1])
+                            big_bin.extend(self.bins[x+1][y-1][z+1])
+                            big_bin.extend(self.bins[x+1][y+1][z+1])
                         else:
                             if z > 0:
-                                atom.neighbours.extend(self.bins[x][y][z-1])
-                                atom.neighbours.extend(self.bins[x+1][y][z-1])
-                                atom.neighbours.extend(self.bins[x][y-1][z-1])
-                                atom.neighbours.extend(self.bins[x][y+1][z-1])
-                                atom.neighbours.extend(self.bins[x+1][y-1][z-1])
-                                atom.neighbours.extend(self.bins[x+1][y+1][z-1])
+                                big_bin.extend(self.bins[x][y][z-1])
+                                big_bin.extend(self.bins[x+1][y][z-1])
+                                big_bin.extend(self.bins[x][y-1][z-1])
+                                big_bin.extend(self.bins[x][y+1][z-1])
+                                big_bin.extend(self.bins[x+1][y-1][z-1])
+                                big_bin.extend(self.bins[x+1][y+1][z-1])
                             if z < zmax:
-                                atom.neighbours.extend(self.bins[x][y][z+1])
-                                atom.neighbours.extend(self.bins[x+1][y][z+1])
-                                atom.neighbours.extend(self.bins[x][y-1][z+1])
-                                atom.neighbours.extend(self.bins[x][y+1][z+1])
-                                atom.neighbours.extend(self.bins[x+1][y-1][z+1])
-                                atom.neighbours.extend(self.bins[x+1][y+1][z+1])
+                                big_bin.extend(self.bins[x][y][z+1])
+                                big_bin.extend(self.bins[x+1][y][z+1])
+                                big_bin.extend(self.bins[x][y-1][z+1])
+                                big_bin.extend(self.bins[x][y+1][z+1])
+                                big_bin.extend(self.bins[x+1][y-1][z+1])
+                                big_bin.extend(self.bins[x+1][y+1][z+1])
                     else:
                         if y > 0:
-                            atom.neighbours.extend(self.bins[x][y-1][z])
-                            atom.neighbours.extend(self.bins[x+1][y-1][z])
+                            big_bin.extend(self.bins[x][y-1][z])
+                            big_bin.extend(self.bins[x+1][y-1][z])
                             if 0 < z < zmax:
-                                atom.neighbours.extend(self.bins[x][y][z-1])
-                                atom.neighbours.extend(self.bins[x][y][z+1])
-                                atom.neighbours.extend(self.bins[x+1][y][z-1])
-                                atom.neighbours.extend(self.bins[x+1][y][z+1])
-                                atom.neighbours.extend(self.bins[x][y-1][z-1])
-                                atom.neighbours.extend(self.bins[x+1][y-1][z-1])
-                                atom.neighbours.extend(self.bins[x][y-1][z+1])
-                                atom.neighbours.extend(self.bins[x+1][y-1][z+1])
+                                big_bin.extend(self.bins[x][y][z-1])
+                                big_bin.extend(self.bins[x][y][z+1])
+                                big_bin.extend(self.bins[x+1][y][z-1])
+                                big_bin.extend(self.bins[x+1][y][z+1])
+                                big_bin.extend(self.bins[x][y-1][z-1])
+                                big_bin.extend(self.bins[x+1][y-1][z-1])
+                                big_bin.extend(self.bins[x][y-1][z+1])
+                                big_bin.extend(self.bins[x+1][y-1][z+1])
                             else:
                                 if z > 0:
-                                    atom.neighbours.extend(self.bins[x][y][z-1])
-                                    atom.neighbours.extend(self.bins[x+1][y][z-1])
-                                    atom.neighbours.extend(self.bins[x][y-1][z-1])
-                                    atom.neighbours.extend(self.bins[x+1][y-1][z-1])
+                                    big_bin.extend(self.bins[x][y][z-1])
+                                    big_bin.extend(self.bins[x+1][y][z-1])
+                                    big_bin.extend(self.bins[x][y-1][z-1])
+                                    big_bin.extend(self.bins[x+1][y-1][z-1])
                                 if z < zmax:
-                                    atom.neighbours.extend(self.bins[x][y][z+1])
-                                    atom.neighbours.extend(self.bins[x+1][y][z+1])
-                                    atom.neighbours.extend(self.bins[x][y-1][z+1])
-                                    atom.neighbours.extend(self.bins[x+1][y-1][z+1])
+                                    big_bin.extend(self.bins[x][y][z+1])
+                                    big_bin.extend(self.bins[x+1][y][z+1])
+                                    big_bin.extend(self.bins[x][y-1][z+1])
+                                    big_bin.extend(self.bins[x+1][y-1][z+1])
                         if y < ymax:
-                            atom.neighbours.extend(self.bins[x][y+1][z])
-                            atom.neighbours.extend(self.bins[x+1][y+1][z])
+                            big_bin.extend(self.bins[x][y+1][z])
+                            big_bin.extend(self.bins[x+1][y+1][z])
                             if 0 < z < zmax:
-                                atom.neighbours.extend(self.bins[x][y][z-1])
-                                atom.neighbours.extend(self.bins[x][y][z+1])
-                                atom.neighbours.extend(self.bins[x+1][y][z-1])
-                                atom.neighbours.extend(self.bins[x+1][y][z+1])
-                                atom.neighbours.extend(self.bins[x][y+1][z-1])
-                                atom.neighbours.extend(self.bins[x+1][y+1][z-1])
-                                atom.neighbours.extend(self.bins[x][y+1][z+1])
-                                atom.neighbours.extend(self.bins[x+1][y+1][z+1])
+                                big_bin.extend(self.bins[x][y][z-1])
+                                big_bin.extend(self.bins[x][y][z+1])
+                                big_bin.extend(self.bins[x+1][y][z-1])
+                                big_bin.extend(self.bins[x+1][y][z+1])
+                                big_bin.extend(self.bins[x][y+1][z-1])
+                                big_bin.extend(self.bins[x+1][y+1][z-1])
+                                big_bin.extend(self.bins[x][y+1][z+1])
+                                big_bin.extend(self.bins[x+1][y+1][z+1])
                             else:
                                 if z > 0:
-                                    atom.neighbours.extend(self.bins[x][y][z-1])
-                                    atom.neighbours.extend(self.bins[x+1][y][z-1])
-                                    atom.neighbours.extend(self.bins[x][y+1][z-1])
-                                    atom.neighbours.extend(self.bins[x+1][y+1][z-1])
+                                    big_bin.extend(self.bins[x][y][z-1])
+                                    big_bin.extend(self.bins[x+1][y][z-1])
+                                    big_bin.extend(self.bins[x][y+1][z-1])
+                                    big_bin.extend(self.bins[x+1][y+1][z-1])
                                 if z < zmax:
-                                    atom.neighbours.extend(self.bins[x][y][z+1])
-                                    atom.neighbours.extend(self.bins[x+1][y][z+1])
-                                    atom.neighbours.extend(self.bins[x][y+1][z+1])
-                                    atom.neighbours.extend(self.bins[x+1][y+1][z+1])
+                                    big_bin.extend(self.bins[x][y][z+1])
+                                    big_bin.extend(self.bins[x+1][y][z+1])
+                                    big_bin.extend(self.bins[x][y+1][z+1])
+                                    big_bin.extend(self.bins[x+1][y+1][z+1])
+            atom.neighbours = np.array(big_bin, dtype=np.int_)
             if atomCounter % modulo == 0:
                 print("Found neighbours for " + str(atomCounter) + " out of " + str(self.number) + " atoms.")
 
@@ -670,16 +672,16 @@ class AtomsSystem:  # TODO: change tuples to lists
         :param method: [string] - method used
         """
         modulo = round(self.number / 10)
-        for atomCounter, atom in enumerate(self.atoms):
-            for neighbour in atom.neighbours:
-                if method is None:
-                    if neighbour not in atom.bonds:
-                        neigh_atom = self.atoms[neighbour]
-                        distance = math.sqrt((atom.coords[0] - neigh_atom.coords[0])**2 + (atom.coords[1] - neigh_atom.coords[1])**2 + (atom.coords[2] - neigh_atom.coords[2])**2)
-                        if distance < 2.0:
-                            atom.bonds.append(neighbour)
-            if atomCounter % modulo == 0:
-                print("Found bonds for " + str(atomCounter) + " out of " + str(self.number) + " atoms.")
+        if method is None:
+            for atomCounter, atom in enumerate(self.atoms):
+                for neighbour in atom.neighbours:
+                    distance = math.sqrt((atom.coords[0] - self.atoms[neighbour].coords[0])**2 +
+                                         (atom.coords[1] - self.atoms[neighbour].coords[1])**2 +
+                                         (atom.coords[2] - self.atoms[neighbour].coords[2])**2)
+                    if distance < 2.0:
+                        atom.bonds.add(neighbour)
+                if atomCounter % modulo == 0:
+                    print("Found bonds for " + str(atomCounter) + " out of " + str(self.number) + " atoms.")
 
     def findMolecules(self):
         """Find molecules in the system."""
