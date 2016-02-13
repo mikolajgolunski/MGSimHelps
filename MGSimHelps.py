@@ -58,6 +58,53 @@ class StopError(Exception):
         return repr(self.value)
 
 
+class Universe:
+    """Head class."""
+    def __init__(self):
+        self.systems = []
+
+    def readFile(self, file_path, file_type=FileType.auto, control_dict=None):
+        """Read file of specified type and save its content to the AtomsSystem.
+
+        :param file_path: [string] - path to the file
+        :param file_type: [string] - [default "auto"] type of file:
+            "auto" - automatically find file_type using file's extension
+            "lammpstrj" - LAMMPS trajectory file
+            "lammps_data" - file read by LAMMPS's function read_data
+            "xyz" - xyz file
+        :param control_dict: [dict] - [Default: {}] dictionary consisting of additional controls that may be needed:
+            "lammps_data_type":
+                "charge"
+        """
+        print("Starting 'readFile' procedure.")
+        if control_dict is None:
+            control_dict = {}
+        if file_type == FileType.auto:
+            print("Detecting filetype automaticaly: ", end="")
+            file_ext = os.path.splitext(file_path)[1][1:].strip().lower()
+            if file_ext == "lammpstrj":
+                file_type = FileType.lammpstrj
+            elif file_ext == "xyz":
+                file_type = FileType.xyz
+            else:
+                raise NotImplementedError(
+                        "No implementation for the " + file_ext + " extension. Please set file_type explicitly."
+                )
+            print(file_type.name)
+
+        with open(file_path, "r") as file:
+            systems = []
+            if file_type == FileType.lammpstrj:
+                systems = [system for system in MGReadFile.readerLammpsFile(file)]
+            elif file_type == FileType.lammps_data:
+                systems = [system for system in MGReadFile.readerLammpsDataFile(file, control_dict)]
+            else:
+                raise NotImplementedError("No implementation for the " + str(file_type.name) + " file_type.")
+        self.systems.extend(systems)
+        print("Successfully read system from " + file_path + " as a " + str(file_type.name) + " file.")
+        print("----------")
+
+
 class Atom:
     """Object containing atoms.
 
@@ -209,45 +256,6 @@ class AtomsSystem:  # TODO: change tuples to lists
     def atoms(self, atoms):
         self._atoms = atoms
         self.number = len(self._atoms)
-
-    def readFile(self, file_path, file_type=FileType.auto, control_dict=None):
-        """Read file of specified type and save its content to the AtomsSystem.
-
-        :param file_path: [string] - path to the file
-        :param file_type: [string] - [default "auto"] type of file:
-            "auto" - automatically find file_type using file's extension
-            "lammpstrj" - LAMMPS trajectory file
-            "lammps_data" - file read by LAMMPS's function read_data
-            "xyz" - xyz file
-        :param control_dict: [dict] - [Default: {}] dictionary consisting of additional controls that may be needed:
-            "lammps_data_type":
-                "charge"
-        """
-        print("Starting 'readFile' procedure.")
-        if control_dict is None:
-            control_dict = {}
-        if file_type == FileType.auto:
-            print("Detecting filetype automaticaly: ", end="")
-            file_ext = os.path.splitext(file_path)[1][1:].strip().lower()
-            if file_ext == "lammpstrj":
-                file_type = FileType.lammpstrj
-            elif file_ext == "xyz":
-                file_type = FileType.xyz
-            else:
-                raise NotImplementedError(
-                        "No implementation for the " + file_ext + " extension. Please set file_type explicitly."
-                )
-            print(file_type.name)
-
-        with open(file_path, "r") as file:
-            if file_type == FileType.lammpstrj:
-                MGReadFile.readLammpsFile(self, file)
-            elif file_type == FileType.lammps_data:
-                MGReadFile.readLammpsDataFile(self, file, control_dict)
-            else:
-                raise NotImplementedError("No implementation for the " + str(file_type.name) + " file_type.")
-        print("Successfully read system from " + file_path + " as a " + str(file_type.name) + " file.")
-        print("----------")
 
     def saveSystem(self, file_path, file_type=FileType.auto, control_dict=None):
         """Save file of the set type using data in the AtomsSystem.
@@ -411,7 +419,7 @@ class AtomsSystem:  # TODO: change tuples to lists
             biny = math.floor((atom.coords[1] - self.bounds["ylo"][1]) / dy)
             binz = math.floor((atom.coords[2] - self.bounds["zlo"][1]) / dz)
             atom.bin = [binx, biny, binz]
-            self.bins[binx][biny][binz] = np.append(self.bins[binx][biny][binz], i)
+            self.bins[binx][biny][binz] = np.append(self.bins[binx][biny][binz], np.array([i]))
             if i % modulo == 0:
                 print("Binned " + str(i) + " out of " + str(self.number) + " atoms.")
         print("----------")
@@ -727,10 +735,10 @@ class AtomsSystem:  # TODO: change tuples to lists
             print("Using default method: atoms closer to each other than 2 A are regarded as bonded.")
             for atomCounter, atom in enumerate(self.atoms):
                 for neighbour in atom.neighbours:
-                    distance = math.sqrt((atom.coords[0] - self.atoms[neighbour].coords[0])**2 +
-                                         (atom.coords[1] - self.atoms[neighbour].coords[1])**2 +
-                                         (atom.coords[2] - self.atoms[neighbour].coords[2])**2)
-                    if distance < 2.0:
+                    distance = (atom.coords[0] - self.atoms[neighbour].coords[0])**2 + \
+                               (atom.coords[1] - self.atoms[neighbour].coords[1])**2 + \
+                               (atom.coords[2] - self.atoms[neighbour].coords[2])**2
+                    if distance < 2.0**2:
                         atom.bonds.add(neighbour)
                 if atomCounter % modulo == 0:
                     print("Found bonds for " + str(atomCounter) + " out of " + str(self.number) + " atoms.")
@@ -812,22 +820,25 @@ class AtomsSystem:  # TODO: change tuples to lists
                   "If this is not what you want run 'findEjected' procedure before this one.")
             self.findEjected(0.0)
         print("Starting 'saveMassSpectrum' procedure.")
-        spectrum_numbers = []
-        spectrum_masses = []
-        for mass in [molecule.mass for molecule in self.molecules_ejected]:
-            mass = round(mass, rounding)
-            if mass not in spectrum_masses:
-                spectrum_masses.append(mass)
-                spectrum_numbers.append(1)
-            else:
-                spectrum_numbers[spectrum_masses.index(mass)] += 1
-        spectrum = list(zip(spectrum_masses, spectrum_numbers))
-        spectrum.sort()
-        print("Found " + str(len(spectrum)) + " distinct masses, from " + str(spectrum[0][1]) + " to " +
-              str(spectrum[-1][1]) + ".")
-        print("Saving data to the file.")
-        with open(file_path, "w") as f:
-            for item in spectrum:
-                f.write(" ".join([str(i) for i in item]) + "\n")
-        print("Saved data to file " + file_path)
+        if len(self.molecules_ejected) > 0:
+            spectrum_numbers = []
+            spectrum_masses = []
+            for mass in [molecule.mass for molecule in self.molecules_ejected]:
+                mass = round(mass, rounding)
+                if mass not in spectrum_masses:
+                    spectrum_masses.append(mass)
+                    spectrum_numbers.append(1)
+                else:
+                    spectrum_numbers[spectrum_masses.index(mass)] += 1
+            spectrum = list(zip(spectrum_masses, spectrum_numbers))
+            spectrum.sort()
+            print("Found " + str(len(spectrum)) + " distinct masses, from " + str(spectrum[0][1]) + " to " +
+                  str(spectrum[-1][1]) + ".")
+            print("Saving data to the file.")
+            with open(file_path, "w") as f:
+                for item in spectrum:
+                    f.write(" ".join([str(i) for i in item]) + "\n")
+            print("Saved data to file " + file_path)
+        else:
+            print("No ejected molecules in the system. Nothing to prepare mass spectrum from. Nothing was saved.")
         print("----------")

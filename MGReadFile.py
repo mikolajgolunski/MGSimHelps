@@ -1,24 +1,36 @@
 import MGSimHelps as MG
 
 
-def readLammpsFile(system, file):  # TODO Implement additional information that can be found in file
+def readerLammpsFile(file):  # TODO Implement additional information that can be found in file
     """Read content of the LAMMPS Trajectory file (extension .lammpstrj).
 
-    :param system: [AtomsSystem] - AtomsSystem object
     :param file: [file] - reference to the file object returned by standard open() method
     """
     print("Reading LAMMPS trajectory file.")
+    print("Frame nr 1")
     print("Following items being read: ", end="")
     axis = 0
+    system = MG.AtomsSystem()
+    counter_frame = 1
+    command = None
+    counter_atoms = 0
     for line in file:
         keyvalue = line.strip().partition(": ")
         if keyvalue[0] == "ITEM":
+            if command == "atoms":
+                yield system
+                system = MG.AtomsSystem()
+                axis = 0
+                counter_frame += 1
+                counter_atoms = 0
+                print("Frame nr " + str(counter_frame))
+                print("Following items being read: ", end="")
             if keyvalue[2].isupper():
                 if keyvalue[2] == "TIMESTEP":
-                    print("timestep ", end="")
+                    print("timestep, ", end="")
                     command = "timestep"
                 elif keyvalue[2] == "TIME":
-                    print("time ", end="")
+                    print("time, ", end="")
                     command = "time"
                 elif keyvalue[2] == "NUMBER OF ATOMS":
                     command = "nr_atoms"
@@ -35,12 +47,11 @@ def readLammpsFile(system, file):  # TODO Implement additional information that 
                         value_elements.append(element)
                 key = " ".join(key_elements)
                 if key == "BOX BOUNDS":
-                    print("boundaries ", end="")
+                    print("boundaries, ", end="")
                     command = "box_bounds"
                 elif key == "ATOMS":
                     print("atoms")
                     command = "atoms"
-                    counter = 0
                 else:
                     raise NotImplementedError("Unknown data header in LAMMPS file: " + keyvalue[2])
         else:
@@ -49,7 +60,7 @@ def readLammpsFile(system, file):  # TODO Implement additional information that 
             elif command == "time":
                 system.time = float(keyvalue[0])
             elif command == "nr_atoms":
-                pass  # nr of atoms
+                pass  # nr of atoms got from atoms' list and not from here
             elif command == "box_bounds":
                 axis += 1
                 split = keyvalue[0].split()
@@ -65,7 +76,7 @@ def readLammpsFile(system, file):  # TODO Implement additional information that 
                 else:
                     raise NotImplementedError("Too many numbers in BOX BOUNDS part of the LAMMPS file.")
             elif command == "atoms":
-                counter += 1
+                counter_atoms += 1
                 split = keyvalue[0].split()
                 temp_dict = {}
                 for key, value in zip(value_elements, split):
@@ -104,28 +115,31 @@ def readLammpsFile(system, file):  # TODO Implement additional information that 
                 if "c_sput_pe" in temp_dict:
                     atom.energy["potential"] = float(temp_dict["c_sput_pe"])
                 system.addAtom(atom)
-                if counter % 100000 == 0:
-                    print("Read " + str(counter) + " atoms.")
+                if counter_atoms % 100000 == 0:
+                    print("Read " + str(counter_atoms) + " atoms.")
             else:
                 raise NameError("Unknown command: " + command)
+    else:
+        yield system
 
 
-def readLammpsDataFile(system, file, control_dict):
+def readerLammpsDataFile(file, control_dict):
     """Read content of the LAMMPS Data file (extension often .dat).
 
-    :param system: [AtomsSystem] - AtomsSystem object
     :param file: [file] - reference to the file object returned by standard open() method
     :param control_dict: [dict]: - dictionary consisting of additional controls that may be needed
             "lammps_data_type":
                 "charge"
     """
     print("Reading LAMMPS Data file using style ", end="")
+    system = MG.AtomsSystem()
     atoms_flag = False
     if control_dict[MG.ControlDict.lammps_data_style] not in control_dict:
         raise NameError("Please provide the data style for LAMMPS data file.")
     print(control_dict[MG.ControlDict.lammps_data_style].name)
     if control_dict[MG.ControlDict.lammps_data_style] == MG.LammpsDataStyle.charge:
         print("Reading header.")
+        counter_atoms = 0
         for line in file:
             content = line.strip().split()
             if "atoms" in content:
@@ -143,18 +157,19 @@ def readLammpsDataFile(system, file, control_dict):
                 system.bounds["zhi"] = (system.bounds["zhi"][0], float(content[1]))
             elif "Atoms" in content and len(content) == 1:
                 print("Reading atoms.")
-                counter = 0
                 atoms_flag = True
             else:
                 if atoms_flag and len(content) > 1:
-                    counter += 1
+                    counter_atoms += 1
                     atom = MG.Atom((float(content[3]), float(content[4]), float(content[5])))
                     atom.id = int(content[0])
                     atom.type = int(content[1])
                     atom.charge = float(content[2])
                     system.addAtom(atom)
-                    if counter % 10000 == 0:
-                        print("Read " + str(counter) + " atoms.")
+                    if counter_atoms % 10000 == 0:
+                        print("Read " + str(counter_atoms) + " atoms.")
+        else:
+            yield system
     else:
         raise NotImplementedError("Data type " + control_dict[MG.ControlDict.lammps_data_style] +
                                   " is not implemented.")
