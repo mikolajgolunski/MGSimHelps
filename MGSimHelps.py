@@ -3,6 +3,7 @@ import itertools
 import os.path
 from enum import Enum
 import numpy as np
+from tqdm import tqdm
 
 import MGReadFile
 import MGSaveFile
@@ -357,9 +358,9 @@ class AtomsSystem:  # TODO: change tuples to lists
 
     def recalculateIDs(self):
         """Recalculate IDs of atoms in the system"""
-        print("Starting 'recalculateIDs procedure.")
+        print("Starting 'recalculateIDs' procedure.")
         for i, atom in enumerate(self.atoms):
-            atom.id = i
+            atom.id = i + 1
         print("----------")
 
     def recalculateTypes(self):
@@ -375,12 +376,16 @@ class AtomsSystem:  # TODO: change tuples to lists
                 self.max_type = atom.type
         print("----------")
 
-    def doBinning(self, new_bounds_q=True):  # TODO: dynamic bins (changing size depending on nr of atoms in bin
+    def _doBinning(self, new_bounds_q=False, method="few_bins"):  # TODO: dynamic bins (changing size depending on nr of atoms in bin
         """Binning atoms.
 
         :param new_bounds_q: [bool] - should boundaries be recalculated?
+        :param method: [string] - method for binning:
+            "few_bins"
+            "long_bins"
         """
-        print("Starting 'doBinning' procedure.")
+        print("Starting '_doBinning' procedure.")
+        self.recalculateIDs()
         if new_bounds_q:
             print("Recalculating boundaries.")
             self.recalculateBounds()
@@ -404,126 +409,173 @@ class AtomsSystem:  # TODO: change tuples to lists
         if dz < 3:
             dz = 3
 
-        self.bins = [  # TODO: Better list initialization (possible?)
-            [
-                [np.array([], dtype=np.int_)
-                    for z in range(math.ceil(deltaz / dz))]
-                for y in range(math.ceil(deltay / dy))]
-            for x in range(math.ceil(deltax / dx))]
+        if method == "long_bins":
+            self.bins = [[set([]) for x in range(math.ceil(deltax / dx))],
+                         [set([]) for y in range(math.ceil(deltay / dy))],
+                         [set([]) for z in range(math.ceil(deltaz / dz))]]
+            print("Created",
+                  len(self.bins[0]), "x bins,",
+                  len(self.bins[1]), "y bins and",
+                  len(self.bins[2]), "z bins.")
+            modulo = round(self.number / 10)
+            for counter_atom, atom in enumerate(self.atoms):
+                binx = math.floor((atom.coords[0] - self.bounds["xlo"][1]) / dx)
+                biny = math.floor((atom.coords[1] - self.bounds["ylo"][1]) / dy)
+                binz = math.floor((atom.coords[2] - self.bounds["zlo"][1]) / dz)
+                atom.bin = [binx, biny, binz]
+                self.bins[0][binx].add(counter_atom + 1)
+                self.bins[1][biny].add(counter_atom + 1)
+                self.bins[2][binz].add(counter_atom + 1)
+                if counter_atom % modulo == 0:
+                    print("Binned " + str(counter_atom + 1) + " out of " + str(self.number) + " atoms.")
+        elif method == "few_bins":
+            from operator import attrgetter
+            for atom in self.atoms:
+                binx = math.floor((atom.coords[0] - self.bounds["xlo"][1]) / dx)
+                biny = math.floor((atom.coords[1] - self.bounds["ylo"][1]) / dy)
+                binz = math.floor((atom.coords[2] - self.bounds["zlo"][1]) / dz)
+                atom.bin = [binx, biny, binz]
+            atoms_sorted = sorted(self.atoms, key=attrgetter("bin"))
+            temp_bins = []
+            last_bin = [-1, -1, -1]
+            bin_counter = [0, 0, 0]
+            modulo = round(self.number / 10)
+            for counter_atom, atom in enumerate(atoms_sorted):
+                if last_bin == atom.bin:
+                    temp_bins[-1][-1][-1].append(atom.id)
+                elif last_bin[0] != atom.bin[0]:
+                    temp_bins.append([[[atom.id]]])
+                    bin_counter[0] += 1
+                elif last_bin[1] != atom.bin[1]:
+                    temp_bins[-1].append([[atom.id]])
+                    bin_counter[1] += 1
+                elif last_bin[2] != atom.bin[2]:
+                    temp_bins[-1][-1].append([atom.id])
+                    bin_counter[2] += 1
+                else:
+                    raise NotImplementedError
+                last_bin = atom.bin
+                if counter_atom % modulo == 0:
+                    print("Binned " + str(counter_atom) + " out of " + str(self.number) + " atoms.")
+            self.bins = temp_bins
+            bin_counter[2] = round(bin_counter[2] / bin_counter[1], 2)
+            bin_counter[1] = round(bin_counter[1] / bin_counter[0], 2)
+            print("Created (mean)", bin_counter[0], "x bins,", bin_counter[1], "y bins and", bin_counter[2], "z bins.")
+        else:
+            print("Using horrible but easiest binning method.")
+            self.bins = [  # TODO: Better list initialization (possible?)
+                [
+                    [np.array([], dtype=np.int_)
+                        for z in range(math.ceil(deltaz / dz))]
+                    for y in range(math.ceil(deltay / dy))]
+                for x in range(math.ceil(deltax / dx))]
 
-        print("Created " + str(math.ceil(deltaz / dz)) + " x " + str(math.ceil(deltay / dy)) + " x " +
-              str(math.ceil(deltay / dy)) + " bins.")
-        modulo = round(self.number / 10)
-        for i, atom in enumerate(self.atoms):
-            binx = math.floor((atom.coords[0] - self.bounds["xlo"][1]) / dx)
-            biny = math.floor((atom.coords[1] - self.bounds["ylo"][1]) / dy)
-            binz = math.floor((atom.coords[2] - self.bounds["zlo"][1]) / dz)
-            atom.bin = [binx, biny, binz]
-            self.bins[binx][biny][binz] = np.append(self.bins[binx][biny][binz], np.array([i]))
-            if i % modulo == 0:
-                print("Binned " + str(i) + " out of " + str(self.number) + " atoms.")
+            print("Created " + str(math.ceil(deltaz / dz)) + " x " + str(math.ceil(deltay / dy)) + " x " +
+                  str(math.ceil(deltay / dy)) + " bins.")
+            modulo = round(self.number / 10)
+            for counter_atom, atom in enumerate(self.atoms):
+                binx = math.floor((atom.coords[0] - self.bounds["xlo"][1]) / dx)
+                biny = math.floor((atom.coords[1] - self.bounds["ylo"][1]) / dy)
+                binz = math.floor((atom.coords[2] - self.bounds["zlo"][1]) / dz)
+                atom.bin = [binx, biny, binz]
+                self.bins[binx][biny][binz] = np.append(self.bins[binx][biny][binz], np.array([counter_atom + 1]))
+                if counter_atom % modulo == 0:
+                    print("Binned " + str(counter_atom + 1) + " out of " + str(self.number) + " atoms.")
         print("----------")
 
-    def doCloseNeighbours(self):
-        """Create list of closest neighbours for each atom in the system."""
+    def doCloseNeighbours(self, method="few_bins"):
+        """Create list of closest neighbours for each atom in the system.
+
+        :param method: [string] - method of binning:
+            "few_bins"
+            "long_bins"
+        """
         if self.bins is None:
-            print("Binning procedure executon not found. Starting 'doBinning' procedure.")
-            self.doBinning()
+            print("Binning procedure execution not found. Starting '_doBinning' procedure.")
+            self._doBinning(method=method)
         print("Starting 'doCloseNeighbours' procedure.")
-        modulo = round(self.number / 10)
-        xmax = len(self.bins) - 1
-        ymax = len(self.bins[0]) - 1
-        zmax = len(self.bins[0][0]) - 1
-        for atom_counter, atom in enumerate(self.atoms):
-            x = atom.bin[0]
-            y = atom.bin[1]
-            z = atom.bin[2]
-            big_bin = [neigh for neigh in self.bins[x][y][z] if neigh != atom_counter]
-            if 0 < x < xmax:
-                big_bin.extend(self.bins[x-1][y][z])
-                big_bin.extend(self.bins[x+1][y][z])
-                if 0 < y < ymax:
-                    big_bin.extend(self.bins[x][y-1][z])
-                    big_bin.extend(self.bins[x][y+1][z])
-                    big_bin.extend(self.bins[x-1][y-1][z])
-                    big_bin.extend(self.bins[x+1][y-1][z])
-                    big_bin.extend(self.bins[x-1][y+1][z])
-                    big_bin.extend(self.bins[x+1][y+1][z])
-                    if 0 < z < zmax:
-                        big_bin.extend(self.bins[x][y][z-1])
-                        big_bin.extend(self.bins[x][y][z+1])
-                        big_bin.extend(self.bins[x-1][y][z-1])
-                        big_bin.extend(self.bins[x+1][y][z-1])
-                        big_bin.extend(self.bins[x-1][y][z+1])
-                        big_bin.extend(self.bins[x+1][y][z+1])
-                        big_bin.extend(self.bins[x][y-1][z-1])
-                        big_bin.extend(self.bins[x][y+1][z-1])
-                        big_bin.extend(self.bins[x-1][y-1][z-1])
-                        big_bin.extend(self.bins[x+1][y-1][z-1])
-                        big_bin.extend(self.bins[x-1][y+1][z-1])
-                        big_bin.extend(self.bins[x+1][y+1][z-1])
-                        big_bin.extend(self.bins[x][y-1][z+1])
-                        big_bin.extend(self.bins[x][y+1][z+1])
-                        big_bin.extend(self.bins[x-1][y-1][z+1])
-                        big_bin.extend(self.bins[x+1][y-1][z+1])
-                        big_bin.extend(self.bins[x-1][y+1][z+1])
-                        big_bin.extend(self.bins[x+1][y+1][z+1])
-                    else:
-                        if z > 0:
-                            big_bin.extend(self.bins[x][y][z-1])
-                            big_bin.extend(self.bins[x-1][y][z-1])
-                            big_bin.extend(self.bins[x+1][y][z-1])
-                            big_bin.extend(self.bins[x][y-1][z-1])
-                            big_bin.extend(self.bins[x][y+1][z-1])
-                            big_bin.extend(self.bins[x-1][y-1][z-1])
-                            big_bin.extend(self.bins[x+1][y-1][z-1])
-                            big_bin.extend(self.bins[x-1][y+1][z-1])
-                            big_bin.extend(self.bins[x+1][y+1][z-1])
-                        if z < zmax:
-                            big_bin.extend(self.bins[x][y][z+1])
-                            big_bin.extend(self.bins[x-1][y][z+1])
-                            big_bin.extend(self.bins[x+1][y][z+1])
-                            big_bin.extend(self.bins[x][y-1][z+1])
-                            big_bin.extend(self.bins[x][y+1][z+1])
-                            big_bin.extend(self.bins[x-1][y-1][z+1])
-                            big_bin.extend(self.bins[x+1][y-1][z+1])
-                            big_bin.extend(self.bins[x-1][y+1][z+1])
-                            big_bin.extend(self.bins[x+1][y+1][z+1])
-                else:
-                    if y > 0:
+
+        if method == "long_bins":
+            modulo = round(self.number / 10)
+            for atom_counter, atom in tqdm(enumerate(self.atoms)):
+                x = atom.bin[0]
+                y = atom.bin[1]
+                z = atom.bin[2]
+                big_bin = set()
+                for i in [x-1, x, x+1]:
+                    for j in [y-1, y, y+1]:
+                        for k in [z-1, z, z+1]:
+                            try:
+                                big_bin = big_bin.union(self.bins[0][i].intersection(self.bins[1][j], self.bins[2][k]))
+                            except IndexError:
+                                continue
+                atom.neighbours = np.array([near for near in big_bin if near != atom_counter + 1])
+                # if atom_counter % modulo == 0:
+                #     print("Found neighbours for " + str(atom_counter + 1) + " out of " + str(self.number) + " atoms.")
+        elif method == "few_bins":
+            modulo = round(self.number / 10)
+            counter = 0
+            for counter_x, bin_x in enumerate(self.bins):
+                for bin_y in bin_x:
+                    for bin_z in bin_y:
+                        big_bin = []
+                        bin_now = self.atoms[bin_z[0] - 1].bin
+                        for x in [-1, 0, 1]:
+                            try:
+                                bin_check = self.atoms[self.bins[counter_x + x][0][0][0] - 1].bin
+                            except IndexError:
+                                continue
+                            if bin_check[0] > bin_now[0] + 1 or counter_x + x < 0:
+                                continue
+                            counter_y = 0
+                            while True:
+                                try:
+                                    bin_check = self.atoms[self.bins[counter_x + x][counter_y][0][0] - 1].bin
+                                except IndexError:
+                                    break
+                                if bin_check[1] > bin_now[1] + 1:
+                                    break
+                                for y in [-1, 0, 1]:
+                                    if bin_check[0:2] == [bin_now[0] + x, bin_now[1] + y]:
+                                        counter_z = 0
+                                        while True:
+                                            try:
+                                                bin_check = self.atoms[self.bins[counter_x + x][counter_y][counter_z]
+                                                                       [0] - 1].bin
+                                            except IndexError:
+                                                break
+                                            if bin_check[2] > bin_now[2] + 1:
+                                                break
+                                            for z in [-1, 0, 1]:
+                                                if bin_check == [bin_now[0] + x, bin_now[1] + y, bin_now[2] + z]:
+                                                    big_bin.extend(self.bins[counter_x + x][counter_y][counter_z])
+                                            counter_z += 1
+                                counter_y += 1
+                        for atom_nr in bin_z:
+                            self.atoms[atom_nr - 1].neighbours = np.array([near for near in big_bin if near != atom_nr],
+                                                                          dtype=np.int_)
+                            counter += 1
+                            if counter % modulo == 0:
+                                print("Found neighbours for " + str(counter) + " out of " + str(self.number) + " atoms.")
+        else:
+            print("Using old, horrible but easy method.")
+            modulo = round(self.number / 10)
+            xmax = len(self.bins) - 1
+            ymax = len(self.bins[0]) - 1
+            zmax = len(self.bins[0][0]) - 1
+            for atom_counter, atom in enumerate(self.atoms):
+                x = atom.bin[0]
+                y = atom.bin[1]
+                z = atom.bin[2]
+                big_bin = [neigh for neigh in self.bins[x][y][z] if neigh != atom_counter + 1]
+                if 0 < x < xmax:
+                    big_bin.extend(self.bins[x-1][y][z])
+                    big_bin.extend(self.bins[x+1][y][z])
+                    if 0 < y < ymax:
                         big_bin.extend(self.bins[x][y-1][z])
+                        big_bin.extend(self.bins[x][y+1][z])
                         big_bin.extend(self.bins[x-1][y-1][z])
                         big_bin.extend(self.bins[x+1][y-1][z])
-                        if 0 < z < zmax:
-                            big_bin.extend(self.bins[x][y][z-1])
-                            big_bin.extend(self.bins[x][y][z+1])
-                            big_bin.extend(self.bins[x-1][y][z-1])
-                            big_bin.extend(self.bins[x+1][y][z-1])
-                            big_bin.extend(self.bins[x-1][y][z+1])
-                            big_bin.extend(self.bins[x+1][y][z+1])
-                            big_bin.extend(self.bins[x][y-1][z-1])
-                            big_bin.extend(self.bins[x-1][y-1][z-1])
-                            big_bin.extend(self.bins[x+1][y-1][z-1])
-                            big_bin.extend(self.bins[x][y-1][z+1])
-                            big_bin.extend(self.bins[x-1][y-1][z+1])
-                            big_bin.extend(self.bins[x+1][y-1][z+1])
-                        else:
-                            if z > 0:
-                                big_bin.extend(self.bins[x][y][z-1])
-                                big_bin.extend(self.bins[x-1][y][z-1])
-                                big_bin.extend(self.bins[x+1][y][z-1])
-                                big_bin.extend(self.bins[x][y-1][z-1])
-                                big_bin.extend(self.bins[x-1][y-1][z-1])
-                                big_bin.extend(self.bins[x+1][y-1][z-1])
-                            if z < zmax:
-                                big_bin.extend(self.bins[x][y][z+1])
-                                big_bin.extend(self.bins[x-1][y][z+1])
-                                big_bin.extend(self.bins[x+1][y][z+1])
-                                big_bin.extend(self.bins[x][y-1][z+1])
-                                big_bin.extend(self.bins[x-1][y-1][z+1])
-                                big_bin.extend(self.bins[x+1][y-1][z+1])
-                    if y < ymax:
-                        big_bin.extend(self.bins[x][y+1][z])
                         big_bin.extend(self.bins[x-1][y+1][z])
                         big_bin.extend(self.bins[x+1][y+1][z])
                         if 0 < z < zmax:
@@ -533,10 +585,16 @@ class AtomsSystem:  # TODO: change tuples to lists
                             big_bin.extend(self.bins[x+1][y][z-1])
                             big_bin.extend(self.bins[x-1][y][z+1])
                             big_bin.extend(self.bins[x+1][y][z+1])
+                            big_bin.extend(self.bins[x][y-1][z-1])
                             big_bin.extend(self.bins[x][y+1][z-1])
+                            big_bin.extend(self.bins[x-1][y-1][z-1])
+                            big_bin.extend(self.bins[x+1][y-1][z-1])
                             big_bin.extend(self.bins[x-1][y+1][z-1])
                             big_bin.extend(self.bins[x+1][y+1][z-1])
+                            big_bin.extend(self.bins[x][y-1][z+1])
                             big_bin.extend(self.bins[x][y+1][z+1])
+                            big_bin.extend(self.bins[x-1][y-1][z+1])
+                            big_bin.extend(self.bins[x+1][y-1][z+1])
                             big_bin.extend(self.bins[x-1][y+1][z+1])
                             big_bin.extend(self.bins[x+1][y+1][z+1])
                         else:
@@ -544,184 +602,255 @@ class AtomsSystem:  # TODO: change tuples to lists
                                 big_bin.extend(self.bins[x][y][z-1])
                                 big_bin.extend(self.bins[x-1][y][z-1])
                                 big_bin.extend(self.bins[x+1][y][z-1])
+                                big_bin.extend(self.bins[x][y-1][z-1])
                                 big_bin.extend(self.bins[x][y+1][z-1])
+                                big_bin.extend(self.bins[x-1][y-1][z-1])
+                                big_bin.extend(self.bins[x+1][y-1][z-1])
                                 big_bin.extend(self.bins[x-1][y+1][z-1])
                                 big_bin.extend(self.bins[x+1][y+1][z-1])
                             if z < zmax:
                                 big_bin.extend(self.bins[x][y][z+1])
                                 big_bin.extend(self.bins[x-1][y][z+1])
                                 big_bin.extend(self.bins[x+1][y][z+1])
-                                big_bin.extend(self.bins[x][y+1][z+1])
-                                big_bin.extend(self.bins[x-1][y+1][z+1])
-                                big_bin.extend(self.bins[x+1][y+1][z+1])
-            else:
-                if x > 0:
-                    big_bin.extend(self.bins[x-1][y][z])
-                    if 0 < y < ymax:
-                        big_bin.extend(self.bins[x][y-1][z])
-                        big_bin.extend(self.bins[x][y+1][z])
-                        big_bin.extend(self.bins[x-1][y-1][z])
-                        big_bin.extend(self.bins[x-1][y+1][z])
-                        if 0 < z < zmax:
-                            big_bin.extend(self.bins[x][y][z-1])
-                            big_bin.extend(self.bins[x][y][z+1])
-                            big_bin.extend(self.bins[x-1][y][z-1])
-                            big_bin.extend(self.bins[x-1][y][z+1])
-                            big_bin.extend(self.bins[x][y-1][z-1])
-                            big_bin.extend(self.bins[x][y+1][z-1])
-                            big_bin.extend(self.bins[x-1][y-1][z-1])
-                            big_bin.extend(self.bins[x-1][y+1][z-1])
-                            big_bin.extend(self.bins[x][y-1][z+1])
-                            big_bin.extend(self.bins[x][y+1][z+1])
-                            big_bin.extend(self.bins[x-1][y-1][z+1])
-                            big_bin.extend(self.bins[x-1][y+1][z+1])
-                        else:
-                            if z > 0:
-                                big_bin.extend(self.bins[x][y][z-1])
-                                big_bin.extend(self.bins[x-1][y][z-1])
-                                big_bin.extend(self.bins[x][y-1][z-1])
-                                big_bin.extend(self.bins[x][y+1][z-1])
-                                big_bin.extend(self.bins[x-1][y-1][z-1])
-                                big_bin.extend(self.bins[x-1][y+1][z-1])
-                            if z < zmax:
-                                big_bin.extend(self.bins[x][y][z+1])
-                                big_bin.extend(self.bins[x-1][y][z+1])
                                 big_bin.extend(self.bins[x][y-1][z+1])
                                 big_bin.extend(self.bins[x][y+1][z+1])
                                 big_bin.extend(self.bins[x-1][y-1][z+1])
+                                big_bin.extend(self.bins[x+1][y-1][z+1])
                                 big_bin.extend(self.bins[x-1][y+1][z+1])
+                                big_bin.extend(self.bins[x+1][y+1][z+1])
                     else:
                         if y > 0:
                             big_bin.extend(self.bins[x][y-1][z])
                             big_bin.extend(self.bins[x-1][y-1][z])
+                            big_bin.extend(self.bins[x+1][y-1][z])
                             if 0 < z < zmax:
                                 big_bin.extend(self.bins[x][y][z-1])
                                 big_bin.extend(self.bins[x][y][z+1])
                                 big_bin.extend(self.bins[x-1][y][z-1])
+                                big_bin.extend(self.bins[x+1][y][z-1])
                                 big_bin.extend(self.bins[x-1][y][z+1])
+                                big_bin.extend(self.bins[x+1][y][z+1])
                                 big_bin.extend(self.bins[x][y-1][z-1])
                                 big_bin.extend(self.bins[x-1][y-1][z-1])
+                                big_bin.extend(self.bins[x+1][y-1][z-1])
                                 big_bin.extend(self.bins[x][y-1][z+1])
                                 big_bin.extend(self.bins[x-1][y-1][z+1])
+                                big_bin.extend(self.bins[x+1][y-1][z+1])
                             else:
                                 if z > 0:
                                     big_bin.extend(self.bins[x][y][z-1])
                                     big_bin.extend(self.bins[x-1][y][z-1])
+                                    big_bin.extend(self.bins[x+1][y][z-1])
                                     big_bin.extend(self.bins[x][y-1][z-1])
                                     big_bin.extend(self.bins[x-1][y-1][z-1])
+                                    big_bin.extend(self.bins[x+1][y-1][z-1])
                                 if z < zmax:
                                     big_bin.extend(self.bins[x][y][z+1])
                                     big_bin.extend(self.bins[x-1][y][z+1])
+                                    big_bin.extend(self.bins[x+1][y][z+1])
                                     big_bin.extend(self.bins[x][y-1][z+1])
                                     big_bin.extend(self.bins[x-1][y-1][z+1])
+                                    big_bin.extend(self.bins[x+1][y-1][z+1])
                         if y < ymax:
                             big_bin.extend(self.bins[x][y+1][z])
+                            big_bin.extend(self.bins[x-1][y+1][z])
+                            big_bin.extend(self.bins[x+1][y+1][z])
+                            if 0 < z < zmax:
+                                big_bin.extend(self.bins[x][y][z-1])
+                                big_bin.extend(self.bins[x][y][z+1])
+                                big_bin.extend(self.bins[x-1][y][z-1])
+                                big_bin.extend(self.bins[x+1][y][z-1])
+                                big_bin.extend(self.bins[x-1][y][z+1])
+                                big_bin.extend(self.bins[x+1][y][z+1])
+                                big_bin.extend(self.bins[x][y+1][z-1])
+                                big_bin.extend(self.bins[x-1][y+1][z-1])
+                                big_bin.extend(self.bins[x+1][y+1][z-1])
+                                big_bin.extend(self.bins[x][y+1][z+1])
+                                big_bin.extend(self.bins[x-1][y+1][z+1])
+                                big_bin.extend(self.bins[x+1][y+1][z+1])
+                            else:
+                                if z > 0:
+                                    big_bin.extend(self.bins[x][y][z-1])
+                                    big_bin.extend(self.bins[x-1][y][z-1])
+                                    big_bin.extend(self.bins[x+1][y][z-1])
+                                    big_bin.extend(self.bins[x][y+1][z-1])
+                                    big_bin.extend(self.bins[x-1][y+1][z-1])
+                                    big_bin.extend(self.bins[x+1][y+1][z-1])
+                                if z < zmax:
+                                    big_bin.extend(self.bins[x][y][z+1])
+                                    big_bin.extend(self.bins[x-1][y][z+1])
+                                    big_bin.extend(self.bins[x+1][y][z+1])
+                                    big_bin.extend(self.bins[x][y+1][z+1])
+                                    big_bin.extend(self.bins[x-1][y+1][z+1])
+                                    big_bin.extend(self.bins[x+1][y+1][z+1])
+                else:
+                    if x > 0:
+                        big_bin.extend(self.bins[x-1][y][z])
+                        if 0 < y < ymax:
+                            big_bin.extend(self.bins[x][y-1][z])
+                            big_bin.extend(self.bins[x][y+1][z])
+                            big_bin.extend(self.bins[x-1][y-1][z])
                             big_bin.extend(self.bins[x-1][y+1][z])
                             if 0 < z < zmax:
                                 big_bin.extend(self.bins[x][y][z-1])
                                 big_bin.extend(self.bins[x][y][z+1])
                                 big_bin.extend(self.bins[x-1][y][z-1])
                                 big_bin.extend(self.bins[x-1][y][z+1])
+                                big_bin.extend(self.bins[x][y-1][z-1])
                                 big_bin.extend(self.bins[x][y+1][z-1])
+                                big_bin.extend(self.bins[x-1][y-1][z-1])
                                 big_bin.extend(self.bins[x-1][y+1][z-1])
+                                big_bin.extend(self.bins[x][y-1][z+1])
                                 big_bin.extend(self.bins[x][y+1][z+1])
+                                big_bin.extend(self.bins[x-1][y-1][z+1])
                                 big_bin.extend(self.bins[x-1][y+1][z+1])
                             else:
                                 if z > 0:
                                     big_bin.extend(self.bins[x][y][z-1])
                                     big_bin.extend(self.bins[x-1][y][z-1])
+                                    big_bin.extend(self.bins[x][y-1][z-1])
                                     big_bin.extend(self.bins[x][y+1][z-1])
+                                    big_bin.extend(self.bins[x-1][y-1][z-1])
                                     big_bin.extend(self.bins[x-1][y+1][z-1])
                                 if z < zmax:
                                     big_bin.extend(self.bins[x][y][z+1])
                                     big_bin.extend(self.bins[x-1][y][z+1])
+                                    big_bin.extend(self.bins[x][y-1][z+1])
+                                    big_bin.extend(self.bins[x][y+1][z+1])
+                                    big_bin.extend(self.bins[x-1][y-1][z+1])
+                                    big_bin.extend(self.bins[x-1][y+1][z+1])
+                        else:
+                            if y > 0:
+                                big_bin.extend(self.bins[x][y-1][z])
+                                big_bin.extend(self.bins[x-1][y-1][z])
+                                if 0 < z < zmax:
+                                    big_bin.extend(self.bins[x][y][z-1])
+                                    big_bin.extend(self.bins[x][y][z+1])
+                                    big_bin.extend(self.bins[x-1][y][z-1])
+                                    big_bin.extend(self.bins[x-1][y][z+1])
+                                    big_bin.extend(self.bins[x][y-1][z-1])
+                                    big_bin.extend(self.bins[x-1][y-1][z-1])
+                                    big_bin.extend(self.bins[x][y-1][z+1])
+                                    big_bin.extend(self.bins[x-1][y-1][z+1])
+                                else:
+                                    if z > 0:
+                                        big_bin.extend(self.bins[x][y][z-1])
+                                        big_bin.extend(self.bins[x-1][y][z-1])
+                                        big_bin.extend(self.bins[x][y-1][z-1])
+                                        big_bin.extend(self.bins[x-1][y-1][z-1])
+                                    if z < zmax:
+                                        big_bin.extend(self.bins[x][y][z+1])
+                                        big_bin.extend(self.bins[x-1][y][z+1])
+                                        big_bin.extend(self.bins[x][y-1][z+1])
+                                        big_bin.extend(self.bins[x-1][y-1][z+1])
+                            if y < ymax:
+                                big_bin.extend(self.bins[x][y+1][z])
+                                big_bin.extend(self.bins[x-1][y+1][z])
+                                if 0 < z < zmax:
+                                    big_bin.extend(self.bins[x][y][z-1])
+                                    big_bin.extend(self.bins[x][y][z+1])
+                                    big_bin.extend(self.bins[x-1][y][z-1])
+                                    big_bin.extend(self.bins[x-1][y][z+1])
+                                    big_bin.extend(self.bins[x][y+1][z-1])
+                                    big_bin.extend(self.bins[x-1][y+1][z-1])
                                     big_bin.extend(self.bins[x][y+1][z+1])
                                     big_bin.extend(self.bins[x-1][y+1][z+1])
-                if x < xmax:
-                    big_bin.extend(self.bins[x+1][y][z])
-                    if 0 < y < ymax:
-                        big_bin.extend(self.bins[x][y-1][z])
-                        big_bin.extend(self.bins[x][y+1][z])
-                        big_bin.extend(self.bins[x+1][y-1][z])
-                        big_bin.extend(self.bins[x+1][y+1][z])
-                        if 0 < z < zmax:
-                            big_bin.extend(self.bins[x][y][z-1])
-                            big_bin.extend(self.bins[x][y][z+1])
-                            big_bin.extend(self.bins[x+1][y][z-1])
-                            big_bin.extend(self.bins[x+1][y][z+1])
-                            big_bin.extend(self.bins[x][y-1][z-1])
-                            big_bin.extend(self.bins[x][y+1][z-1])
-                            big_bin.extend(self.bins[x+1][y-1][z-1])
-                            big_bin.extend(self.bins[x+1][y+1][z-1])
-                            big_bin.extend(self.bins[x][y-1][z+1])
-                            big_bin.extend(self.bins[x][y+1][z+1])
-                            big_bin.extend(self.bins[x+1][y-1][z+1])
-                            big_bin.extend(self.bins[x+1][y+1][z+1])
-                        else:
-                            if z > 0:
-                                big_bin.extend(self.bins[x][y][z-1])
-                                big_bin.extend(self.bins[x+1][y][z-1])
-                                big_bin.extend(self.bins[x][y-1][z-1])
-                                big_bin.extend(self.bins[x][y+1][z-1])
-                                big_bin.extend(self.bins[x+1][y-1][z-1])
-                                big_bin.extend(self.bins[x+1][y+1][z-1])
-                            if z < zmax:
-                                big_bin.extend(self.bins[x][y][z+1])
-                                big_bin.extend(self.bins[x+1][y][z+1])
-                                big_bin.extend(self.bins[x][y-1][z+1])
-                                big_bin.extend(self.bins[x][y+1][z+1])
-                                big_bin.extend(self.bins[x+1][y-1][z+1])
-                                big_bin.extend(self.bins[x+1][y+1][z+1])
-                    else:
-                        if y > 0:
+                                else:
+                                    if z > 0:
+                                        big_bin.extend(self.bins[x][y][z-1])
+                                        big_bin.extend(self.bins[x-1][y][z-1])
+                                        big_bin.extend(self.bins[x][y+1][z-1])
+                                        big_bin.extend(self.bins[x-1][y+1][z-1])
+                                    if z < zmax:
+                                        big_bin.extend(self.bins[x][y][z+1])
+                                        big_bin.extend(self.bins[x-1][y][z+1])
+                                        big_bin.extend(self.bins[x][y+1][z+1])
+                                        big_bin.extend(self.bins[x-1][y+1][z+1])
+                    if x < xmax:
+                        big_bin.extend(self.bins[x+1][y][z])
+                        if 0 < y < ymax:
                             big_bin.extend(self.bins[x][y-1][z])
-                            big_bin.extend(self.bins[x+1][y-1][z])
-                            if 0 < z < zmax:
-                                big_bin.extend(self.bins[x][y][z-1])
-                                big_bin.extend(self.bins[x][y][z+1])
-                                big_bin.extend(self.bins[x+1][y][z-1])
-                                big_bin.extend(self.bins[x+1][y][z+1])
-                                big_bin.extend(self.bins[x][y-1][z-1])
-                                big_bin.extend(self.bins[x+1][y-1][z-1])
-                                big_bin.extend(self.bins[x][y-1][z+1])
-                                big_bin.extend(self.bins[x+1][y-1][z+1])
-                            else:
-                                if z > 0:
-                                    big_bin.extend(self.bins[x][y][z-1])
-                                    big_bin.extend(self.bins[x+1][y][z-1])
-                                    big_bin.extend(self.bins[x][y-1][z-1])
-                                    big_bin.extend(self.bins[x+1][y-1][z-1])
-                                if z < zmax:
-                                    big_bin.extend(self.bins[x][y][z+1])
-                                    big_bin.extend(self.bins[x+1][y][z+1])
-                                    big_bin.extend(self.bins[x][y-1][z+1])
-                                    big_bin.extend(self.bins[x+1][y-1][z+1])
-                        if y < ymax:
                             big_bin.extend(self.bins[x][y+1][z])
+                            big_bin.extend(self.bins[x+1][y-1][z])
                             big_bin.extend(self.bins[x+1][y+1][z])
                             if 0 < z < zmax:
                                 big_bin.extend(self.bins[x][y][z-1])
                                 big_bin.extend(self.bins[x][y][z+1])
                                 big_bin.extend(self.bins[x+1][y][z-1])
                                 big_bin.extend(self.bins[x+1][y][z+1])
+                                big_bin.extend(self.bins[x][y-1][z-1])
                                 big_bin.extend(self.bins[x][y+1][z-1])
+                                big_bin.extend(self.bins[x+1][y-1][z-1])
                                 big_bin.extend(self.bins[x+1][y+1][z-1])
+                                big_bin.extend(self.bins[x][y-1][z+1])
                                 big_bin.extend(self.bins[x][y+1][z+1])
+                                big_bin.extend(self.bins[x+1][y-1][z+1])
                                 big_bin.extend(self.bins[x+1][y+1][z+1])
                             else:
                                 if z > 0:
                                     big_bin.extend(self.bins[x][y][z-1])
                                     big_bin.extend(self.bins[x+1][y][z-1])
+                                    big_bin.extend(self.bins[x][y-1][z-1])
                                     big_bin.extend(self.bins[x][y+1][z-1])
+                                    big_bin.extend(self.bins[x+1][y-1][z-1])
                                     big_bin.extend(self.bins[x+1][y+1][z-1])
                                 if z < zmax:
                                     big_bin.extend(self.bins[x][y][z+1])
                                     big_bin.extend(self.bins[x+1][y][z+1])
+                                    big_bin.extend(self.bins[x][y-1][z+1])
+                                    big_bin.extend(self.bins[x][y+1][z+1])
+                                    big_bin.extend(self.bins[x+1][y-1][z+1])
+                                    big_bin.extend(self.bins[x+1][y+1][z+1])
+                        else:
+                            if y > 0:
+                                big_bin.extend(self.bins[x][y-1][z])
+                                big_bin.extend(self.bins[x+1][y-1][z])
+                                if 0 < z < zmax:
+                                    big_bin.extend(self.bins[x][y][z-1])
+                                    big_bin.extend(self.bins[x][y][z+1])
+                                    big_bin.extend(self.bins[x+1][y][z-1])
+                                    big_bin.extend(self.bins[x+1][y][z+1])
+                                    big_bin.extend(self.bins[x][y-1][z-1])
+                                    big_bin.extend(self.bins[x+1][y-1][z-1])
+                                    big_bin.extend(self.bins[x][y-1][z+1])
+                                    big_bin.extend(self.bins[x+1][y-1][z+1])
+                                else:
+                                    if z > 0:
+                                        big_bin.extend(self.bins[x][y][z-1])
+                                        big_bin.extend(self.bins[x+1][y][z-1])
+                                        big_bin.extend(self.bins[x][y-1][z-1])
+                                        big_bin.extend(self.bins[x+1][y-1][z-1])
+                                    if z < zmax:
+                                        big_bin.extend(self.bins[x][y][z+1])
+                                        big_bin.extend(self.bins[x+1][y][z+1])
+                                        big_bin.extend(self.bins[x][y-1][z+1])
+                                        big_bin.extend(self.bins[x+1][y-1][z+1])
+                            if y < ymax:
+                                big_bin.extend(self.bins[x][y+1][z])
+                                big_bin.extend(self.bins[x+1][y+1][z])
+                                if 0 < z < zmax:
+                                    big_bin.extend(self.bins[x][y][z-1])
+                                    big_bin.extend(self.bins[x][y][z+1])
+                                    big_bin.extend(self.bins[x+1][y][z-1])
+                                    big_bin.extend(self.bins[x+1][y][z+1])
+                                    big_bin.extend(self.bins[x][y+1][z-1])
+                                    big_bin.extend(self.bins[x+1][y+1][z-1])
                                     big_bin.extend(self.bins[x][y+1][z+1])
                                     big_bin.extend(self.bins[x+1][y+1][z+1])
-            atom.neighbours = np.array(big_bin, dtype=np.int_)
-            if atom_counter % modulo == 0:
-                print("Found neighbours for " + str(atom_counter) + " out of " + str(self.number) + " atoms.")
+                                else:
+                                    if z > 0:
+                                        big_bin.extend(self.bins[x][y][z-1])
+                                        big_bin.extend(self.bins[x+1][y][z-1])
+                                        big_bin.extend(self.bins[x][y+1][z-1])
+                                        big_bin.extend(self.bins[x+1][y+1][z-1])
+                                    if z < zmax:
+                                        big_bin.extend(self.bins[x][y][z+1])
+                                        big_bin.extend(self.bins[x+1][y][z+1])
+                                        big_bin.extend(self.bins[x][y+1][z+1])
+                                        big_bin.extend(self.bins[x+1][y+1][z+1])
+                atom.neighbours = np.array(big_bin, dtype=np.int_)
+                if atom_counter % modulo == 0:
+                    print("Found neighbours for " + str(atom_counter + 1) + " out of " + str(self.number) + " atoms.")
         print("----------")
 
     def findBonds(self, method=None):  # TODO: Add additional methods of calculating bonds
@@ -735,10 +864,10 @@ class AtomsSystem:  # TODO: change tuples to lists
             print("Using default method: atoms closer to each other than 2 A are regarded as bonded.")
             for atomCounter, atom in enumerate(self.atoms):
                 for neighbour in atom.neighbours:
-                    distance = (atom.coords[0] - self.atoms[neighbour].coords[0])**2 + \
-                               (atom.coords[1] - self.atoms[neighbour].coords[1])**2 + \
-                               (atom.coords[2] - self.atoms[neighbour].coords[2])**2
-                    if distance < 2.0**2:
+                    distance = (atom.coords[0] - self.atoms[neighbour - 1].coords[0])**2 + \
+                               (atom.coords[1] - self.atoms[neighbour - 1].coords[1])**2 + \
+                               (atom.coords[2] - self.atoms[neighbour - 1].coords[2])**2
+                    if distance < 3.0**2:
                         atom.bonds.add(neighbour)
                 if atomCounter % modulo == 0:
                     print("Found bonds for " + str(atomCounter) + " out of " + str(self.number) + " atoms.")
@@ -751,16 +880,16 @@ class AtomsSystem:  # TODO: change tuples to lists
         self.molecules = []
         modulo = round(self.number / 10)
         for atom_counter, atom in enumerate(self.atoms):
-            if atom_counter not in atoms_in_molecules:
+            if (atom_counter + 1) not in atoms_in_molecules:
                 self.molecules.append(Molecule(atom))
-                atoms_in_molecules.add(atom_counter)
+                atoms_in_molecules.add(atom_counter + 1)
                 for mol_atom in self.molecules[-1].atoms:
                     for bond in mol_atom.bonds:
                         if bond not in atoms_in_molecules:
-                            self.molecules[-1].atoms.append(self.atoms[bond])
+                            self.molecules[-1].atoms.append(self.atoms[bond - 1])
                             atoms_in_molecules.add(bond)
             if atom_counter % modulo == 0:
-                print("Found molecules for " + str(atom_counter) + " out of " + str(self.number) + " atoms.")
+                print("Found molecules for " + str(atom_counter + 1) + " out of " + str(self.number) + " atoms.")
         for molecule in self.molecules:
             for atom in molecule.atoms:
                 molecule.mass += atom.mass
@@ -832,8 +961,8 @@ class AtomsSystem:  # TODO: change tuples to lists
                     spectrum_numbers[spectrum_masses.index(mass)] += 1
             spectrum = list(zip(spectrum_masses, spectrum_numbers))
             spectrum.sort()
-            print("Found " + str(len(spectrum)) + " distinct masses, from " + str(spectrum[0][1]) + " to " +
-                  str(spectrum[-1][1]) + ".")
+            print("Found " + str(len(spectrum)) + " distinct masses, from " + str(spectrum[0][0]) + " to " +
+                  str(spectrum[-1][0]) + ".")
             print("Saving data to the file.")
             with open(file_path, "w") as f:
                 for item in spectrum:

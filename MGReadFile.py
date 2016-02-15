@@ -134,7 +134,7 @@ def readerLammpsDataFile(file, control_dict):
     print("Reading LAMMPS Data file using style ", end="")
     system = MG.AtomsSystem()
     atoms_flag = False
-    if control_dict[MG.ControlDict.lammps_data_style] not in control_dict:
+    if MG.ControlDict.lammps_data_style not in control_dict:
         raise NameError("Please provide the data style for LAMMPS data file.")
     print(control_dict[MG.ControlDict.lammps_data_style].name)
     if control_dict[MG.ControlDict.lammps_data_style] == MG.LammpsDataStyle.charge:
