@@ -5,9 +5,9 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="46bc38a9-87b7-47de-b820-1cb101b6332c" name="Default" comment="">
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/inspectionProfiles/Project_Default.xml" afterPath="$PROJECT_DIR$/.idea/inspectionProfiles/Project_Default.xml" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/MGReadFile.py" afterPath="$PROJECT_DIR$/MGReadFile.py" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/MGSaveFile.py" afterPath="$PROJECT_DIR$/MGSaveFile.py" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/MGSimHelps.py" afterPath="$PROJECT_DIR$/MGSimHelps.py" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/aaa.py" afterPath="$PROJECT_DIR$/aaa.py" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/main.py" afterPath="$PROJECT_DIR$/main.py" />
@@ -35,7 +35,7 @@
         <entry file="file://$PROJECT_DIR$/main.py">
           <provider selected="true" editor-type-id="text-editor">
             <state vertical-scroll-proportion="0.0">
-              <caret line="26" column="50" selection-start-line="26" selection-start-column="50" selection-end-line="26" selection-end-column="50" />
+              <caret line="10" column="88" selection-start-line="10" selection-start-column="43" selection-end-line="10" selection-end-column="88" />
               <folding>
                 <element signature="e#0#17#0" expanded="true" />
               </folding>
@@ -59,7 +59,7 @@
         <entry file="file://$PROJECT_DIR$/MGReadFile.py">
           <provider selected="true" editor-type-id="text-editor">
             <state vertical-scroll-proportion="0.0">
-              <caret line="138" column="62" selection-start-line="138" selection-start-column="62" selection-end-line="138" selection-end-column="62" />
+              <caret line="190" column="38" selection-start-line="190" selection-start-column="38" selection-end-line="190" selection-end-column="38" />
               <folding />
             </state>
           </provider>
@@ -69,8 +69,11 @@
         <entry file="file://$PROJECT_DIR$/MGSaveFile.py">
           <provider selected="true" editor-type-id="text-editor">
             <state vertical-scroll-proportion="0.0">
-              <caret line="99" column="89" selection-start-line="99" selection-start-column="89" selection-end-line="99" selection-end-column="89" />
-              <folding />
+              <caret line="31" column="69" selection-start-line="31" selection-start-column="69" selection-end-line="31" selection-end-column="69" />
+              <folding>
+                <marker date="1455533462000" expanded="false" signature="0:45" placeholder="import ..." />
+                <marker date="1455533462000" expanded="true" signature="2016:8164" placeholder="..." />
+              </folding>
             </state>
           </provider>
         </entry>
@@ -79,7 +82,7 @@
         <entry file="file://$PROJECT_DIR$/MGSimHelps.py">
           <provider selected="true" editor-type-id="text-editor">
             <state vertical-scroll-proportion="0.0">
-              <caret line="529" column="41" selection-start-line="529" selection-start-column="41" selection-end-line="529" selection-end-column="41" />
+              <caret line="105" column="0" selection-start-line="105" selection-start-column="0" selection-end-line="105" selection-end-column="0" />
               <folding />
             </state>
           </provider>
@@ -88,8 +91,8 @@
       <file leaf-file-name="aaa.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/aaa.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state vertical-scroll-proportion="0.40753424">
-              <caret line="14" column="23" selection-start-line="14" selection-start-column="23" selection-end-line="14" selection-end-column="23" />
+            <state vertical-scroll-proportion="0.22849463">
+              <caret line="5" column="0" selection-start-line="5" selection-start-column="0" selection-end-line="5" selection-end-column="0" />
               <folding />
             </state>
           </provider>
@@ -120,11 +123,11 @@
     <option name="CHANGED_PATHS">
       <list>
         <option value="$PROJECT_DIR$/test.py" />
-        <option value="$PROJECT_DIR$/MGSaveFile.py" />
         <option value="$PROJECT_DIR$/MGTiming.py" />
+        <option value="$PROJECT_DIR$/MGSaveFile.py" />
         <option value="$PROJECT_DIR$/main.py" />
-        <option value="$PROJECT_DIR$/MGReadFile.py" />
         <option value="$PROJECT_DIR$/MGSimHelps.py" />
+        <option value="$PROJECT_DIR$/MGReadFile.py" />
         <option value="$PROJECT_DIR$/aaa.py" />
       </list>
     </option>
@@ -421,7 +424,13 @@
       <option name="project" value="LOCAL" />
       <updated>1455325804249</updated>
     </task>
-    <option name="localTasksCounter" value="10" />
+    <task id="LOCAL-00010" summary="Working &quot;few_bins&quot; binning method!">
+      <created>1455529466105</created>
+      <option name="number" value="00010" />
+      <option name="project" value="LOCAL" />
+      <updated>1455529466105</updated>
+    </task>
+    <option name="localTasksCounter" value="11" />
     <servers />
   </component>
   <component name="TestHistory">
@@ -445,11 +454,9 @@
       <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.17857143" sideWeight="0.5" order="0" side_tool="false" content_ui="combo" />
       <window_info id="TODO" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32981783" sideWeight="0.5" order="6" side_tool="false" content_ui="tabs" />
       <window_info id="Event Log" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.3747954" sideWeight="0.5029762" order="7" side_tool="true" content_ui="tabs" />
-      <window_info id="Find" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32843137" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
-      <window_info id="Inspection" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.39869282" sideWeight="0.5" order="5" side_tool="false" content_ui="tabs" />
-      <window_info id="Python Console" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.3480392" sideWeight="0.5" order="11" side_tool="false" content_ui="tabs" x="-8" y="-8" width="1382" height="744" />
+      <window_info id="Python Console" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.34640524" sideWeight="0.5" order="11" side_tool="false" content_ui="tabs" x="-8" y="-8" width="1382" height="744" />
       <window_info id="Version Control" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32352942" sideWeight="0.5" order="8" side_tool="false" content_ui="tabs" />
-      <window_info id="Run" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33496732" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
+      <window_info id="Run" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33333334" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
       <window_info id="Structure" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
       <window_info id="Terminal" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.3281075" sideWeight="0.5" order="9" side_tool="false" content_ui="tabs" />
       <window_info id="Favorites" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="2" side_tool="true" content_ui="tabs" />
@@ -458,7 +465,9 @@
       <window_info id="Messages" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="10" side_tool="false" content_ui="tabs" />
       <window_info id="Message" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="0" side_tool="false" content_ui="tabs" />
       <window_info id="Commander" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.4" sideWeight="0.5" order="0" side_tool="false" content_ui="tabs" />
+      <window_info id="Inspection" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.39869282" sideWeight="0.5" order="5" side_tool="false" content_ui="tabs" />
       <window_info id="Hierarchy" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="2" side_tool="false" content_ui="combo" />
+      <window_info id="Find" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32843137" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
       <window_info id="Ant Build" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
     </layout>
   </component>
@@ -483,11 +492,12 @@
     <MESSAGE value="Find nearest neighbours (with commented sections)." />
     <MESSAGE value="Different molecules-related functions and some small addictions everywhere." />
     <MESSAGE value="Changed reading files to use generators and added timing module." />
-    <option name="LAST_COMMIT_MESSAGE" value="Changed reading files to use generators and added timing module." />
+    <MESSAGE value="Working &quot;few_bins&quot; binning method!" />
+    <option name="LAST_COMMIT_MESSAGE" value="Working &quot;few_bins&quot; binning method!" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
-      <option name="time" value="28" />
+      <option name="time" value="30" />
     </breakpoint-manager>
     <watches-manager />
   </component>
@@ -522,7 +532,10 @@
       <provider selected="true" editor-type-id="text-editor">
         <state vertical-scroll-proportion="0.0">
           <caret line="167" column="12" selection-start-line="167" selection-start-column="12" selection-end-line="168" selection-end-column="88" />
-          <folding />
+          <folding>
+            <marker date="1455533462000" expanded="false" signature="0:45" placeholder="import ..." />
+            <marker date="1455533462000" expanded="true" signature="2016:8164" placeholder="..." />
+          </folding>
         </state>
       </provider>
     </entry>
@@ -564,7 +577,10 @@
       <provider selected="true" editor-type-id="text-editor">
         <state vertical-scroll-proportion="0.0">
           <caret line="167" column="12" selection-start-line="167" selection-start-column="12" selection-end-line="168" selection-end-column="88" />
-          <folding />
+          <folding>
+            <marker date="1455533462000" expanded="false" signature="0:45" placeholder="import ..." />
+            <marker date="1455533462000" expanded="true" signature="2016:8164" placeholder="..." />
+          </folding>
         </state>
       </provider>
     </entry>
@@ -606,7 +622,10 @@
       <provider selected="true" editor-type-id="text-editor">
         <state vertical-scroll-proportion="0.0">
           <caret line="167" column="12" selection-start-line="167" selection-start-column="12" selection-end-line="168" selection-end-column="88" />
-          <folding />
+          <folding>
+            <marker date="1455533462000" expanded="false" signature="0:45" placeholder="import ..." />
+            <marker date="1455533462000" expanded="true" signature="2016:8164" placeholder="..." />
+          </folding>
         </state>
       </provider>
     </entry>
@@ -648,7 +667,10 @@
       <provider selected="true" editor-type-id="text-editor">
         <state vertical-scroll-proportion="0.0">
           <caret line="170" column="0" selection-start-line="170" selection-start-column="0" selection-end-line="170" selection-end-column="0" />
-          <folding />
+          <folding>
+            <marker date="1455533462000" expanded="false" signature="0:45" placeholder="import ..." />
+            <marker date="1455533462000" expanded="true" signature="2016:8164" placeholder="..." />
+          </folding>
         </state>
       </provider>
     </entry>
@@ -690,7 +712,10 @@
       <provider selected="true" editor-type-id="text-editor">
         <state vertical-scroll-proportion="0.0">
           <caret line="28" column="0" selection-start-line="28" selection-start-column="0" selection-end-line="28" selection-end-column="0" />
-          <folding />
+          <folding>
+            <marker date="1455533462000" expanded="false" signature="0:45" placeholder="import ..." />
+            <marker date="1455533462000" expanded="true" signature="2016:8164" placeholder="..." />
+          </folding>
         </state>
       </provider>
     </entry>
@@ -732,7 +757,10 @@
       <provider selected="true" editor-type-id="text-editor">
         <state vertical-scroll-proportion="0.0">
           <caret line="16" column="45" selection-start-line="16" selection-start-column="45" selection-end-line="16" selection-end-column="45" />
-          <folding />
+          <folding>
+            <marker date="1455533462000" expanded="false" signature="0:45" placeholder="import ..." />
+            <marker date="1455533462000" expanded="true" signature="2016:8164" placeholder="..." />
+          </folding>
         </state>
       </provider>
     </entry>
@@ -766,7 +794,10 @@
       <provider selected="true" editor-type-id="text-editor">
         <state vertical-scroll-proportion="0.0">
           <caret line="0" column="0" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
-          <folding />
+          <folding>
+            <marker date="1455533462000" expanded="false" signature="0:45" placeholder="import ..." />
+            <marker date="1455533462000" expanded="true" signature="2016:8164" placeholder="..." />
+          </folding>
         </state>
       </provider>
     </entry>
@@ -800,7 +831,10 @@
       <provider selected="true" editor-type-id="text-editor">
         <state vertical-scroll-proportion="0.0">
           <caret line="0" column="0" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
-          <folding />
+          <folding>
+            <marker date="1455533462000" expanded="false" signature="0:45" placeholder="import ..." />
+            <marker date="1455533462000" expanded="true" signature="2016:8164" placeholder="..." />
+          </folding>
         </state>
       </provider>
     </entry>
@@ -834,7 +868,10 @@
       <provider selected="true" editor-type-id="text-editor">
         <state vertical-scroll-proportion="0.0">
           <caret line="0" column="0" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
-          <folding />
+          <folding>
+            <marker date="1455533462000" expanded="false" signature="0:45" placeholder="import ..." />
+            <marker date="1455533462000" expanded="true" signature="2016:8164" placeholder="..." />
+          </folding>
         </state>
       </provider>
     </entry>
@@ -867,14 +904,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/MGSaveFile.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0">
-          <caret line="99" column="89" selection-start-line="99" selection-start-column="89" selection-end-line="99" selection-end-column="89" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/MGTiming.py">
       <provider selected="true" editor-type-id="text-editor">
         <state vertical-scroll-proportion="0.0">
@@ -885,10 +914,29 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/MGSaveFile.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state vertical-scroll-proportion="0.0">
+          <caret line="31" column="69" selection-start-line="31" selection-start-column="69" selection-end-line="31" selection-end-column="69" />
+          <folding>
+            <marker date="1455533462000" expanded="false" signature="0:45" placeholder="import ..." />
+            <marker date="1455533462000" expanded="true" signature="2016:8164" placeholder="..." />
+          </folding>
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/MGReadFile.py">
       <provider selected="true" editor-type-id="text-editor">
         <state vertical-scroll-proportion="0.0">
-          <caret line="138" column="62" selection-start-line="138" selection-start-column="62" selection-end-line="138" selection-end-column="62" />
+          <caret line="190" column="38" selection-start-line="190" selection-start-column="38" selection-end-line="190" selection-end-column="38" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/MGSimHelps.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state vertical-scroll-proportion="0.0">
+          <caret line="105" column="0" selection-start-line="105" selection-start-column="0" selection-end-line="105" selection-end-column="0" />
           <folding />
         </state>
       </provider>
@@ -896,25 +944,17 @@
     <entry file="file://$PROJECT_DIR$/main.py">
       <provider selected="true" editor-type-id="text-editor">
         <state vertical-scroll-proportion="0.0">
-          <caret line="26" column="50" selection-start-line="26" selection-start-column="50" selection-end-line="26" selection-end-column="50" />
+          <caret line="10" column="88" selection-start-line="10" selection-start-column="43" selection-end-line="10" selection-end-column="88" />
           <folding>
             <element signature="e#0#17#0" expanded="true" />
           </folding>
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/MGSimHelps.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0">
-          <caret line="529" column="41" selection-start-line="529" selection-start-column="41" selection-end-line="529" selection-end-column="41" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/aaa.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.40753424">
-          <caret line="14" column="23" selection-start-line="14" selection-start-column="23" selection-end-line="14" selection-end-column="23" />
+        <state vertical-scroll-proportion="0.22849463">
+          <caret line="5" column="0" selection-start-line="5" selection-start-column="0" selection-end-line="5" selection-end-column="0" />
           <folding />
         </state>
       </provider>

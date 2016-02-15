@@ -1,4 +1,6 @@
 import MGSimHelps as MG
+from tqdm import tqdm
+
 
 def saveLammpsDataFile(system, file, control_dict):
     """Save the LAMMPS Data file (extension often .dat).
@@ -13,7 +15,6 @@ def saveLammpsDataFile(system, file, control_dict):
         raise NameError("Please provide the data style for LAMMPS data file.")
     print("Saving system into LAMMPS Data file using " + control_dict[MG.ControlDict.lammps_data_style].name +
           " style.")
-    modulo = round(system.number / 10)
     if control_dict[MG.ControlDict.lammps_data_style] == MG.LammpsDataStyle.charge:
         print("Writing header.")
         file.write(
@@ -27,12 +28,10 @@ def saveLammpsDataFile(system, file, control_dict):
             " Atoms\n"
             "\n"
         )
-        for i, atom in enumerate(system.atoms):
+        for i, atom in tqdm(enumerate(system.atoms), total=system.number, unit="atom"):
             coord_str = " ".join(str(coord) for coord in atom.coords)
             file.write(str(atom.id) + " " + str(atom.type) + " " + str(atom.charge) + " " + coord_str + "\n")
-            if i % modulo == 0:
-                print("Written " + str(i) + " out of " + str(system.number) + " atoms.")
-        print("Finished writing atoms.")
+        print("\nFinished writing atoms.")
     else:
         raise NotImplementedError("Data type " + control_dict[MG.ControlDict.lammps_data_style] +
                                   " is not implemented.")
@@ -129,8 +128,7 @@ def saveLammpsFile(system, file, control_dict):
             "ITEM: ATOMS "
         )
         file.write(properties_str + "\n")
-        modulo = round(system.number / 10)
-        for i, atom in enumerate(system.atoms):
+        for i, atom in tqdm(enumerate(system.atoms), total=system.number, unit="atom"):
             temp_properties = []
             for key in properties_keys:
                 if key == MG.LammpstrjProp.id:
@@ -165,6 +163,4 @@ def saveLammpsFile(system, file, control_dict):
                     raise NotImplementedError("Property " + str(key) + "not implemented in file save.")
                 temp_properties.append(str(property_value))
             file.write(" ".join(temp_properties) + "\n")
-            if i % modulo == 0:
-                print("Written " + str(i) + " out of " + str(system.number) + " atoms.")
-        print("Finished writing atoms.")
+        print("\nFinished writing atoms.")

@@ -93,17 +93,16 @@ class Universe:
                 )
             print(file_type.name)
 
-        with open(file_path, "r") as file:
-            systems = []
-            if file_type == FileType.lammpstrj:
-                systems = [system for system in MGReadFile.readerLammpsFile(file)]
-            elif file_type == FileType.lammps_data:
-                systems = [system for system in MGReadFile.readerLammpsDataFile(file, control_dict)]
-            else:
-                raise NotImplementedError("No implementation for the " + str(file_type.name) + " file_type.")
-        self.systems.extend(systems)
-        print("Successfully read system from " + file_path + " as a " + str(file_type.name) + " file.")
-        print("----------")
+        if file_type == FileType.lammpstrj:
+            system = (system for system in MGReadFile.readerLammpsFile(file_path))
+        elif file_type == FileType.lammps_data:
+            system = (system for system in MGReadFile.readerLammpsDataFile(file_path, control_dict))
+        else:
+            raise NotImplementedError("No implementation for the " + str(file_type.name) + " file_type.")
+        for s in system:
+            print("\nSuccessfully read system from " + file_path + " as a " + str(file_type.name) + " file.")
+            print("----------")
+            yield s
 
 
 class Atom:
@@ -376,7 +375,7 @@ class AtomsSystem:  # TODO: change tuples to lists
                 self.max_type = atom.type
         print("----------")
 
-    def _doBinning(self, new_bounds_q=False, method="few_bins"):  # TODO: dynamic bins (changing size depending on nr of atoms in bin
+    def _doBinning(self, new_bounds_q=False, method="few_bins"):
         """Binning atoms.
 
         :param new_bounds_q: [bool] - should boundaries be recalculated?
@@ -417,8 +416,7 @@ class AtomsSystem:  # TODO: change tuples to lists
                   len(self.bins[0]), "x bins,",
                   len(self.bins[1]), "y bins and",
                   len(self.bins[2]), "z bins.")
-            modulo = round(self.number / 10)
-            for counter_atom, atom in enumerate(self.atoms):
+            for counter_atom, atom in tqdm(enumerate(self.atoms), total=self.number, unit="atom"):
                 binx = math.floor((atom.coords[0] - self.bounds["xlo"][1]) / dx)
                 biny = math.floor((atom.coords[1] - self.bounds["ylo"][1]) / dy)
                 binz = math.floor((atom.coords[2] - self.bounds["zlo"][1]) / dz)
@@ -426,10 +424,9 @@ class AtomsSystem:  # TODO: change tuples to lists
                 self.bins[0][binx].add(counter_atom + 1)
                 self.bins[1][biny].add(counter_atom + 1)
                 self.bins[2][binz].add(counter_atom + 1)
-                if counter_atom % modulo == 0:
-                    print("Binned " + str(counter_atom + 1) + " out of " + str(self.number) + " atoms.")
         elif method == "few_bins":
             from operator import attrgetter
+            dx, dy, dz = 3, 3, 3
             for atom in self.atoms:
                 binx = math.floor((atom.coords[0] - self.bounds["xlo"][1]) / dx)
                 biny = math.floor((atom.coords[1] - self.bounds["ylo"][1]) / dy)
@@ -439,8 +436,7 @@ class AtomsSystem:  # TODO: change tuples to lists
             temp_bins = []
             last_bin = [-1, -1, -1]
             bin_counter = [0, 0, 0]
-            modulo = round(self.number / 10)
-            for counter_atom, atom in enumerate(atoms_sorted):
+            for counter_atom, atom in tqdm(enumerate(atoms_sorted), total=self.number, unit="atom"):
                 if last_bin == atom.bin:
                     temp_bins[-1][-1][-1].append(atom.id)
                 elif last_bin[0] != atom.bin[0]:
@@ -455,12 +451,12 @@ class AtomsSystem:  # TODO: change tuples to lists
                 else:
                     raise NotImplementedError
                 last_bin = atom.bin
-                if counter_atom % modulo == 0:
-                    print("Binned " + str(counter_atom) + " out of " + str(self.number) + " atoms.")
             self.bins = temp_bins
+            bin_total = bin_counter[2]
             bin_counter[2] = round(bin_counter[2] / bin_counter[1], 2)
             bin_counter[1] = round(bin_counter[1] / bin_counter[0], 2)
-            print("Created (mean)", bin_counter[0], "x bins,", bin_counter[1], "y bins and", bin_counter[2], "z bins.")
+            print("\nCreated total", bin_total, "bins (means:", bin_counter[0], "x bins,", bin_counter[1], "y bins and",
+                  bin_counter[2], "z).")
         else:
             print("Using horrible but easiest binning method.")
             self.bins = [  # TODO: Better list initialization (possible?)
@@ -472,16 +468,13 @@ class AtomsSystem:  # TODO: change tuples to lists
 
             print("Created " + str(math.ceil(deltaz / dz)) + " x " + str(math.ceil(deltay / dy)) + " x " +
                   str(math.ceil(deltay / dy)) + " bins.")
-            modulo = round(self.number / 10)
-            for counter_atom, atom in enumerate(self.atoms):
+            for counter_atom, atom in tqdm(enumerate(self.atoms), total=self.number, unit="atom"):
                 binx = math.floor((atom.coords[0] - self.bounds["xlo"][1]) / dx)
                 biny = math.floor((atom.coords[1] - self.bounds["ylo"][1]) / dy)
                 binz = math.floor((atom.coords[2] - self.bounds["zlo"][1]) / dz)
                 atom.bin = [binx, biny, binz]
                 self.bins[binx][biny][binz] = np.append(self.bins[binx][biny][binz], np.array([counter_atom + 1]))
-                if counter_atom % modulo == 0:
-                    print("Binned " + str(counter_atom + 1) + " out of " + str(self.number) + " atoms.")
-        print("----------")
+        print("\n----------")
 
     def doCloseNeighbours(self, method="few_bins"):
         """Create list of closest neighbours for each atom in the system.
@@ -496,8 +489,7 @@ class AtomsSystem:  # TODO: change tuples to lists
         print("Starting 'doCloseNeighbours' procedure.")
 
         if method == "long_bins":
-            modulo = round(self.number / 10)
-            for atom_counter, atom in tqdm(enumerate(self.atoms)):
+            for atom_counter, atom in tqdm(enumerate(self.atoms), total=self.number, unit="atom"):
                 x = atom.bin[0]
                 y = atom.bin[1]
                 z = atom.bin[2]
@@ -510,11 +502,8 @@ class AtomsSystem:  # TODO: change tuples to lists
                             except IndexError:
                                 continue
                 atom.neighbours = np.array([near for near in big_bin if near != atom_counter + 1])
-                # if atom_counter % modulo == 0:
-                #     print("Found neighbours for " + str(atom_counter + 1) + " out of " + str(self.number) + " atoms.")
         elif method == "few_bins":
-            modulo = round(self.number / 10)
-            counter = 0
+            pbar = tqdm(total=self.number, unit="atom")
             for counter_x, bin_x in enumerate(self.bins):
                 for bin_y in bin_x:
                     for bin_z in bin_y:
@@ -552,18 +541,16 @@ class AtomsSystem:  # TODO: change tuples to lists
                                             counter_z += 1
                                 counter_y += 1
                         for atom_nr in bin_z:
-                            self.atoms[atom_nr - 1].neighbours = np.array([near for near in big_bin if near != atom_nr],
-                                                                          dtype=np.int_)
-                            counter += 1
-                            if counter % modulo == 0:
-                                print("Found neighbours for " + str(counter) + " out of " + str(self.number) + " atoms.")
+                            self.atoms[atom_nr - 1].neighbours = np.array([near for near in big_bin if near !=
+                                                                           atom_nr], dtype=np.int_)
+                            pbar.update()
+            pbar.close()
         else:
             print("Using old, horrible but easy method.")
-            modulo = round(self.number / 10)
             xmax = len(self.bins) - 1
             ymax = len(self.bins[0]) - 1
             zmax = len(self.bins[0][0]) - 1
-            for atom_counter, atom in enumerate(self.atoms):
+            for atom_counter, atom in tqdm(enumerate(self.atoms), total=self.number, unit="atom"):
                 x = atom.bin[0]
                 y = atom.bin[1]
                 z = atom.bin[2]
@@ -849,9 +836,7 @@ class AtomsSystem:  # TODO: change tuples to lists
                                         big_bin.extend(self.bins[x][y+1][z+1])
                                         big_bin.extend(self.bins[x+1][y+1][z+1])
                 atom.neighbours = np.array(big_bin, dtype=np.int_)
-                if atom_counter % modulo == 0:
-                    print("Found neighbours for " + str(atom_counter + 1) + " out of " + str(self.number) + " atoms.")
-        print("----------")
+        print("\n----------")
 
     def findBonds(self, method=None):  # TODO: Add additional methods of calculating bonds
         """Find bonds between atoms in the system.
@@ -859,27 +844,23 @@ class AtomsSystem:  # TODO: change tuples to lists
         :param method: [string] - method used
         """
         print("Starting 'findBonds' procedure.")
-        modulo = round(self.number / 10)
         if method is None:
             print("Using default method: atoms closer to each other than 2 A are regarded as bonded.")
-            for atomCounter, atom in enumerate(self.atoms):
+            for atomCounter, atom in tqdm(enumerate(self.atoms), total=self.number, unit="atom"):
                 for neighbour in atom.neighbours:
                     distance = (atom.coords[0] - self.atoms[neighbour - 1].coords[0])**2 + \
                                (atom.coords[1] - self.atoms[neighbour - 1].coords[1])**2 + \
                                (atom.coords[2] - self.atoms[neighbour - 1].coords[2])**2
-                    if distance < 3.0**2:
+                    if distance < 2.0**2:
                         atom.bonds.add(neighbour)
-                if atomCounter % modulo == 0:
-                    print("Found bonds for " + str(atomCounter) + " out of " + str(self.number) + " atoms.")
-        print("----------")
+        print("\n----------")
 
     def findMolecules(self):
         """Find molecules in the system."""
         print("Starting 'findMolecules' procedure.")
         atoms_in_molecules = set()
         self.molecules = []
-        modulo = round(self.number / 10)
-        for atom_counter, atom in enumerate(self.atoms):
+        for atom_counter, atom in tqdm(enumerate(self.atoms), total=self.number, unit="atom"):
             if (atom_counter + 1) not in atoms_in_molecules:
                 self.molecules.append(Molecule(atom))
                 atoms_in_molecules.add(atom_counter + 1)
@@ -888,12 +869,10 @@ class AtomsSystem:  # TODO: change tuples to lists
                         if bond not in atoms_in_molecules:
                             self.molecules[-1].atoms.append(self.atoms[bond - 1])
                             atoms_in_molecules.add(bond)
-            if atom_counter % modulo == 0:
-                print("Found molecules for " + str(atom_counter + 1) + " out of " + str(self.number) + " atoms.")
         for molecule in self.molecules:
             for atom in molecule.atoms:
                 molecule.mass += atom.mass
-        print("Found " + str(len(self.molecules)) + " molecules.")
+        print("\nFound " + str(len(self.molecules)) + " molecules.")
         print("----------")
 
     def findMoleculesCOM(self):
@@ -902,8 +881,7 @@ class AtomsSystem:  # TODO: change tuples to lists
             print("No molecules' lookup found. Executing 'findMolecules' procedure.")
             self.findMolecules()
         print("Starting 'findMoleculesCOM' procedure.")
-        modulo = round(len(self.molecules) / 10)
-        for counter, molecule in enumerate(self.molecules):
+        for counter, molecule in tqdm(enumerate(self.molecules), total=len(self.molecules), unit="mol"):
             mass_sum = 0
             coords_sum = np.array([0.0, 0.0, 0.0])
             for atom in molecule.atoms:
@@ -911,9 +889,7 @@ class AtomsSystem:  # TODO: change tuples to lists
                 atom_coords = np.array(atom.coords)
                 coords_sum += atom_coords * atom.mass
             molecule.centre_of_mass = coords_sum / mass_sum
-            if counter % modulo == 0:
-                print("Found COM for " + str(counter) + " out of " + str(len(self.molecules)) + " molecules.")
-        print("----------")
+        print("\n----------")
 
     def findEjected(self, height):
         """Find ejected molecules.
@@ -926,7 +902,7 @@ class AtomsSystem:  # TODO: change tuples to lists
             self.findMolecules()
         print("Starting 'findEjected' procedure.")
         self.molecules_ejected = []
-        for molecule in self.molecules:
+        for molecule in tqdm(self.molecules, total=len(self.molecules), unit="mol"):
             try:
                 for atom in molecule.atoms:
                     if atom.coords[2] < height:
@@ -934,7 +910,7 @@ class AtomsSystem:  # TODO: change tuples to lists
                 self.molecules_ejected.append(molecule)
             except StopError:
                 continue
-        print("Found " + str(len(self.molecules_ejected)) + " molecules that are ejected.")
+        print("\nFound " + str(len(self.molecules_ejected)) + " molecules that are ejected.")
         print("----------")
 
     def saveMassSpectrum(self, file_path, rounding=0):
@@ -952,7 +928,8 @@ class AtomsSystem:  # TODO: change tuples to lists
         if len(self.molecules_ejected) > 0:
             spectrum_numbers = []
             spectrum_masses = []
-            for mass in [molecule.mass for molecule in self.molecules_ejected]:
+            for mass in tqdm([molecule.mass for molecule in self.molecules_ejected], total=len(self.molecules_ejected),
+                             unit="mol"):
                 mass = round(mass, rounding)
                 if mass not in spectrum_masses:
                     spectrum_masses.append(mass)
@@ -961,11 +938,11 @@ class AtomsSystem:  # TODO: change tuples to lists
                     spectrum_numbers[spectrum_masses.index(mass)] += 1
             spectrum = list(zip(spectrum_masses, spectrum_numbers))
             spectrum.sort()
-            print("Found " + str(len(spectrum)) + " distinct masses, from " + str(spectrum[0][0]) + " to " +
+            print("\nFound " + str(len(spectrum)) + " distinct masses, from " + str(spectrum[0][0]) + " to " +
                   str(spectrum[-1][0]) + ".")
             print("Saving data to the file.")
             with open(file_path, "w") as f:
-                for item in spectrum:
+                for item in tqdm(spectrum):
                     f.write(" ".join([str(i) for i in item]) + "\n")
             print("Saved data to file " + file_path)
         else:

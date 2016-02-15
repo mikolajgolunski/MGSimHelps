@@ -7,7 +7,7 @@ testing = True
 path = "test/"
 
 universe = MGSimHelps.Universe()
-universe.readFile("test/500eV.lammpstrj")
+universe.readFile("test/test.lammpstrj")
 # system.readFile("test/water_lammps.dat", "lammps_data", {"lammps_data_type": "charge"})
 # system.readFile(
 #     path + "5keV.lammpstrj",
@@ -24,7 +24,7 @@ if testing:
         system.stretchBounds(x=[-0.1, 0.1], y=[-0.1, 0.1], z=[-0.1, 0.1])
         system.recalculateIDs()
         system.recalculateTypes()
-        system.doCloseNeighbours(method="long_bins")
+        system.doCloseNeighbours(method="few_bins")
         system.findBonds()
         system.findMolecules()
         system.findMoleculesCOM()
