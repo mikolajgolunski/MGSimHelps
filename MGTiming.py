@@ -6,7 +6,7 @@ from datetime import timedelta
 def log(s, elapsed=None):
     line = "="*40
     print(line)
-    print(asctime(), '-', s)
+    print(asctime(), "-", s)
     if elapsed:
         print("Elapsed time:", timedelta(seconds=elapsed))
     print(line)

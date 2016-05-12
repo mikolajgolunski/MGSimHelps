@@ -93,8 +93,8 @@ def saveLammpsFile(system, file, control_dict):
     if MG.LammpstrjItem.bounds in control_dict[MG.ControlDict.lammpstrj_items]:
         file.write(
             "ITEM: BOX BOUNDS " + str(system.bounds["xlo"][0]) + str(system.bounds["xhi"][0]) + " " +
-                str(system.bounds["ylo"][0]) + str(system.bounds["yhi"][0]) + " " + str(system.bounds["zlo"][0]) +
-                str(system.bounds["zhi"][0]) + "\n"
+            str(system.bounds["ylo"][0]) + str(system.bounds["yhi"][0]) + " " + str(system.bounds["zlo"][0]) +
+            str(system.bounds["zhi"][0]) + "\n"
             "" + str(system.bounds["xlo"][1]) + " " + str(system.bounds["xhi"][1]) + "\n"
             "" + str(system.bounds["ylo"][1]) + " " + str(system.bounds["yhi"][1]) + "\n"
             "" + str(system.bounds["zlo"][1]) + " " + str(system.bounds["zhi"][1]) + "\n"

@@ -1,10 +1,15 @@
+import csv
 import math
 import itertools
 import os.path
 from collections import namedtuple, Counter
 from enum import Enum
+from operator import itemgetter
+
 import numpy as np
+import pickle
 from tqdm import tqdm
+import gzip
 
 import MGReadFile
 import MGSaveFile
@@ -52,6 +57,17 @@ class LammpstrjItem(Enum):
     atoms = 5
 
 
+Reax = namedtuple("Reax", ["p_boc1", "p_boc2", "p_boc3", "p_boc4", "p_boc5", "p_bo1", "p_bo2", "p_bo3", "p_bo4",
+                           "p_bo5", "p_bo6", "Val_at", "Val_boc_at", "Val_neigh", "Val_boc_neigh", "ro_sigma", "ro_pi",
+                           "ro_pipi"])
+ReaxGeneral = namedtuple("ReaxGeneral", ["p_boc1", "p_boc2"])
+ReaxAtoms = namedtuple("ReaxAtoms", ["name", "ro_sigma", "Val", "mass", "ro_pi", "ro_pipi", "p_boc4", "p_boc3",
+                                     "p_boc5", "Val_boc"])
+ReaxBonds = namedtuple("ReaxBonds", ["at1", "at2", "De_sigma", "De_pi", "De_pipi", "p_be1", "p_bo5", "p_bo6", "p_be2",
+                                     "p_bo3", "p_bo4", "p_bo1", "p_bo2"])
+ReaxOffDiagonals = namedtuple("ReaxOffDiagonals", ["at1", "at2", "ro_sigma", "ro_pi", "ro_pipi"])
+
+
 class StopError(Exception):
     def __init__(self, value="Stopped."):
         self.value = value
@@ -65,8 +81,13 @@ class Universe:
     def __init__(self):
         self.systems = []
         self.reax = []
+        self.mass = []
 
-    def readFile(self, file_path, file_type=FileType.auto, control_dict=None):
+    def readMass(self):  # TODO: Implement reading mass/atoms description file
+        mass = {"H": 3, "C": 12, "N": 14, "O": 16}
+        self.mass.append(mass)
+
+    def readFile(self, file_path, file_type=FileType.auto, control_dict=None, gz=False):
         """Read file of specified type and save its content to the AtomsSystem.
 
         :param file_path: [string] - path to the file
@@ -80,11 +101,15 @@ class Universe:
                 "charge"
         """
         print("Starting 'readFile' procedure.")
+        self.readMass()
         if control_dict is None:
             control_dict = {}
         if file_type == FileType.auto:
             print("Detecting filetype automaticaly: ", end="")
-            file_ext = os.path.splitext(file_path)[1][1:].strip().lower()
+            if gz:
+                file_ext = os.path.splitext(file_path[:-3])[1][1:].strip().lower()
+            else:
+                file_ext = os.path.splitext(file_path)[1][1:].strip().lower()
             if file_ext == "lammpstrj":
                 file_type = FileType.lammpstrj
             elif file_ext == "xyz":
@@ -96,12 +121,32 @@ class Universe:
             print(file_type.name)
 
         if file_type == FileType.lammpstrj:
-            system = (system for system in MGReadFile.readerLammpsFile(file_path))
+            if "start" in control_dict.keys():
+                if control_dict["start"] is not None:
+                    start = control_dict["start"]
+                else:
+                    start = 1
+            else:
+                start = 1
+            if "end" in control_dict.keys():
+                if control_dict["end"] is not None:
+                    end = control_dict["end"]
+                else:
+                    end = -1
+            else:
+                end = -1
+            system = (system for system in MGReadFile.readerLammpsFile(file_path, start_frame=start, end_frame=end, gz=gz))
         elif file_type == FileType.lammps_data:
-            system = (system for system in MGReadFile.readerLammpsDataFile(file_path, control_dict))
+            system = (system for system in MGReadFile.readerLammpsDataFile(file_path, control_dict, gz=gz))
         else:
             raise NotImplementedError("No implementation for the " + str(file_type.name) + " file_type.")
         for s in system:
+            for atom in s.atoms:  # TODO: Make it better
+                if atom.name is "Xxx":
+                    if atom.mass is None:
+                        raise ValueError("Atom do not have name nor mass.")
+                    else:
+                        atom.name = list(self.mass[0].keys())[list(self.mass[0].values()).index(round(atom.mass))]
             print("\nSuccessfully read system from " + file_path + " as a " + str(file_type.name) + " file.")
             print("----------")
             yield s
@@ -109,12 +154,6 @@ class Universe:
     # noinspection PyTypeChecker
     def readReax(self, file_path):
         print("Reading ReaxFF parameters file.")
-        ReaxGeneral = namedtuple("ReaxGeneral", ["p_boc1", "p_boc2"])
-        ReaxAtoms = namedtuple("ReaxAtoms", ["name", "ro_sigma", "Val", "mass", "ro_pi", "ro_pipi", "p_boc4", "p_boc3",
-                                             "p_boc5", "Val_boc"])
-        ReaxBonds = namedtuple("ReaxBonds", ["at1", "at2", "De_sigma", "De_pi", "De_pipi", "p_be1", "p_bo5", "p_bo6",
-                                             "p_be2", "p_bo3", "p_bo4", "p_bo1", "p_bo2"])
-        ReaxOffDiagonals = namedtuple("ReaxOffDiagonals", ["at1", "at2", "ro_sigma", "ro_pi", "ro_pipi"])
         with open(file_path, "r") as file:
             temp_list = []
             for i in range(2):
@@ -154,6 +193,7 @@ class Universe:
                         break
                 if stop:
                     continue
+            reax_atoms = tuple(reax_atoms)
             nr = int(temp_line[0])
             file.readline()
             reax_bonds = []
@@ -166,6 +206,7 @@ class Universe:
                 temp_list.extend([float(temp_line[num]) for num in (0, 1, 2, 4, 5)])
 
                 reax_bonds.append(ReaxBonds._make(temp_list))
+            reax_bonds = tuple(reax_bonds)
             nr = int(file.readline().strip().split()[0])
             reax_off_diagonals = []
             for off in range(nr):
@@ -173,8 +214,77 @@ class Universe:
                 temp_list = [int(temp_line[0]), int(temp_line[1])]
                 temp_list.extend([float(temp_line[num]) for num in (5, 6, 7)])
                 reax_off_diagonals.append(ReaxOffDiagonals._make(temp_list))
-        self.reax.append([reax_general, reax_atoms, reax_bonds, reax_off_diagonals])
+            reax_off_diagonals = tuple(reax_off_diagonals)
+        self.reax.append((reax_general, reax_atoms, reax_bonds, reax_off_diagonals))
         print("----------")
+
+    def saveEmittedCoords(self, file_path_full, file_path_partial, energies_path):
+        tracked_ids_full = []
+        tracked_ids_partial = []
+        for molecule in self.systems[1].molecules_ejected:
+            if molecule.spherical_destination is not None:
+                atoms_names = [atom.name for atom in molecule.atoms]
+                if "N" in atoms_names:
+                    for atom in molecule.atoms:
+                        if atom.name == "N":
+                            if molecule.name == "C9H11NO2":
+                                tracked_ids_full.append(atom.id)
+                            else:
+                                tracked_ids_partial.append(atom.id)
+                elif "O" in atoms_names:
+                    for atom in molecule.atoms:
+                        if atom.name == "O":
+                            tracked_ids_partial.append(atom.id)
+                else:
+                    tracked_ids_partial.append(molecule.atoms[0].id)
+        tracked_ids_full = set(tracked_ids_full)
+        tracked_ids_partial = set(tracked_ids_partial)
+
+        tracked_molecules_full = set()
+        tracked_molecules_partial = set()
+        for molecule in self.systems[0].molecules:
+            for atom in molecule.atoms:
+                if atom.id in tracked_ids_full:
+                    tracked_molecules_full.add(molecule.id)
+                    break
+                elif atom.id in tracked_ids_partial:
+                    tracked_molecules_partial.add(molecule.id)
+                    break
+
+        coordinates_full = []
+        coordinates_partial = []
+        energies = []
+        for molecule in self.systems[0].molecules:
+            if molecule.id in tracked_molecules_full:
+                coordinates_full.append(molecule.centre_of_mass["coords"])
+                if molecule.energy["kinetic"] * 103.6427 > 6:
+                    energies.append({"coords": molecule.centre_of_mass["coords"],
+                                     "energy": molecule.energy["kinetic"] * 103.6427})
+            elif molecule.id in tracked_molecules_partial:
+                coordinates_partial.append(molecule.centre_of_mass["coords"])
+
+        os.makedirs(os.path.dirname(file_path_full), exist_ok=True)
+        with open(file_path_full, "w", newline="") as file:
+            csvfile = csv.writer(file, delimiter="\t")
+            csvfile.writerow(["x", "y", "z"])
+            for coord in coordinates_full:
+                csvfile.writerow(coord)
+
+        os.makedirs(os.path.dirname(file_path_partial), exist_ok=True)
+        with open(file_path_partial, "w", newline="") as file:
+            csvfile = csv.writer(file, delimiter="\t")
+            csvfile.writerow(["x", "y", "z"])
+            for coord in coordinates_partial:
+                csvfile.writerow(coord)
+
+        os.makedirs(os.path.dirname(energies_path), exist_ok=True)
+        with open(energies_path, "w", newline="") as file:
+            csvfile = csv.writer(file, delimiter="\t")
+            csvfile.writerow(["total kinetic energy [eV]", "x", "y", "z"])
+            for energy in energies:
+                row = energy["coords"]
+                row.insert(0, energy["energy"])
+                csvfile.writerow(row)
 
 
 class Bond:
@@ -216,7 +326,7 @@ class Atom:
         bonds [list] - atoms that the atom is bonded to
     """
 
-    _new_id = next(itertools.count())
+    _new_id = itertools.count()
 
     def __init__(self, coords):
         """
@@ -226,12 +336,12 @@ class Atom:
             [float] - z coordinate
         """
         self.coords = coords
-        self.id = Atom._new_id
+        self.id = next(Atom._new_id)
         self.charge = 0.0
         self.velocity = (0.0, 0.0, 0.0)
         self.type = 1
         self.name = "Xxx"
-        self.mass = 1.0
+        self.mass = None
         self.energy = {"kinetic": 0.0, "potential": 0.0}
         self.neighbours = []
         self.bin = None
@@ -251,13 +361,17 @@ class Molecule:
         mass [float] - mass of the molecule
         centre_of_mass [list] - coords of centre of mass
     """
+    _new_id = itertools.count()
+
     def __init__(self, atom):
         self.atoms = [atom]
         self.mass = 0.0
-        self.centre_of_mass = np.array([0.0, 0.0, 0.0])
+        self.centre_of_mass = None
         self.name = ""
-        self.energy = {"kinetic": None}
+        self.energy = {"kinetic": None, "internal": None}
         self.velocity = None
+        self.id = next(Molecule._new_id)
+        self.spherical_destination = None
 
     def __str__(self):
         return "Molecule: number of atoms " + str(len(self.atoms)) + "; total mass " + str(self.mass)
@@ -290,7 +404,7 @@ class AtomsSystem:  # TODO: change tuples to lists
         reax_params None [namedtuple] - reaxFF parameters
     """
 
-    def __init__(self):
+    def __init__(self, name):
         self._atoms = []
         self.number = 0
         self._next_iter_id = next(itertools.count())
@@ -309,6 +423,7 @@ class AtomsSystem:  # TODO: change tuples to lists
         self.molecules = None
         self.molecules_ejected = None
         self.reax_params = None
+        self.name = name
 
     def __iter__(self):
         return self
@@ -339,6 +454,26 @@ class AtomsSystem:  # TODO: change tuples to lists
     def atoms(self, atoms):
         self._atoms = atoms
         self.number = len(self._atoms)
+
+    def archiveSystem(self, dir_path):
+        """Archive system as pickled file.
+
+        :param dir_path: [string] - path to the directory where archive folder is or should be created
+        """
+        path = os.path.join(dir_path, "archive", self.name)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with gzip.open(path, "wb") as file:
+            pickle.dump(self, file, protocol=pickle.HIGHEST_PROTOCOL)
+
+    def correct_coords(self):
+        name_split = self.name.split("_")
+        name_index = name_split.index("phe1L")
+        dx = int(name_split[name_index + 1])
+        dy = int(name_split[name_index + 2].split(".")[0])
+        for atom in self.atoms:
+            atom.coords = list(atom.coords)
+            atom.coords[0] -= dx
+            atom.coords[1] -= dy
 
     def saveSystem(self, file_path, file_type=FileType.auto, control_dict=None):
         """Save file of the set type using data in the AtomsSystem.
@@ -537,8 +672,14 @@ class AtomsSystem:  # TODO: change tuples to lists
                 last_bin = atom.bin
             self.bins = temp_bins
             bin_total = bin_counter[2]
-            bin_counter[2] = round(bin_counter[2] / bin_counter[1], 2)
-            bin_counter[1] = round(bin_counter[1] / bin_counter[0], 2)
+            if bin_counter[1] > 0:
+                bin_counter[2] = round(bin_counter[2] / bin_counter[1], 2)
+            else:
+                bin_counter[2] = 1
+            if bin_counter[0] > 0:
+                bin_counter[1] = round(bin_counter[1] / bin_counter[0], 2)
+            else:
+                bin_counter[1] = 1
             print("\nCreated total", bin_total, "bins (means:", bin_counter[0], "x bins,", bin_counter[1], "y bins and",
                   bin_counter[2], "z).")
         else:
@@ -625,8 +766,9 @@ class AtomsSystem:  # TODO: change tuples to lists
                                             counter_z += 1
                                 counter_y += 1
                         for atom_nr in bin_z:
-                            self.atoms[atom_nr - 1].neighbours = np.array([near for near in big_bin if near !=
-                                                                           atom_nr], dtype=np.int_)
+                            # self.atoms[atom_nr - 1].neighbours = np.array([near for near in big_bin if near !=
+                            #                                                atom_nr], dtype=np.int_)
+                            self.atoms[atom_nr - 1].neighbours = tuple([near for near in big_bin if near != atom_nr])
                             pbar.update()
             pbar.close()
         else:
@@ -941,9 +1083,7 @@ class AtomsSystem:  # TODO: change tuples to lists
                         atom.bonds.append(Bond(neighbour))
         elif method is "reaxFF":
             print("Using reax method.")
-            Reax = namedtuple("Reax", ["p_boc1", "p_boc2", "p_boc3", "p_boc4", "p_boc5", "p_bo1", "p_bo2", "p_bo3",
-                                       "p_bo4", "p_bo5", "p_bo6", "Val_at", "Val_boc_at", "Val_neigh", "Val_boc_neigh",
-                                       "ro_sigma", "ro_pi", "ro_pipi"])
+
             r_cutoff = 3
 
             def BO_sigma_prim(reax, r_ij):
@@ -1093,44 +1233,41 @@ class AtomsSystem:  # TODO: change tuples to lists
             print("No molecules' lookup found. Executing 'findMolecules' procedure.")
             self.findMolecules()
         print("Starting 'findMoleculesCOM' procedure.")
-        for molecule in tqdm(self.molecules, total=len(self.molecules), unit="mol"):
+        for molecule in tqdm(self.molecules, total=len(self.molecules), unit="molecules"):
             mass_sum = 0
             coords_sum = np.array([0.0, 0.0, 0.0])
+            v_sum = np.array([0.0, 0.0, 0.0])
             for atom in molecule.atoms:
                 mass_sum += atom.mass
                 atom_coords = np.array(atom.coords)
+                atom_v = np.array(atom.velocity)
                 coords_sum += atom_coords * atom.mass
-            molecule.centre_of_mass = coords_sum / mass_sum
+                v_sum += atom_v * atom.mass
+            molecule.centre_of_mass = {"coords": list(coords_sum / mass_sum), "v": list(v_sum / mass_sum)}
         print("\n----------")
 
-    def findMoleculesKineticEnergy(self):
-        """Find molecules' kinetic energies."""
+    def findMoleculesEnergies(self):
+        """Find molecules' energies."""
         if self.molecules is None:
             print("No molecules' lookup found. Executing 'findMolecules' procedure.")
             self.findMolecules()
             self.findMoleculesCOM()
-        print("Starting 'findMoleculesKineticEnergy' procedure.")
-        stop = False
-        while True:
-            for molecule in tqdm(self.molecules, unit="mol"):
-                if molecule.centre_of_mass is None:
-                    break
-                v = np.array([0.0, 0.0, 0.0])
-                for atom in molecule.atoms:
-                    v += np.array(atom.velocity) * atom.mass
-                v = v / molecule.mass
-                molecule.velocity = [math.sqrt(sum(v**2)), v]
-                molecule.energy["kinetic"] = [molecule.mass * molecule.velocity[0]**2 / 2, molecule.mass * v**2 / 2]
-            else:
-                stop = True
-
-            if stop:
-                break
-            else:
-                print("Molecules lack centre of mass. Executing 'findMoleculesCOM' procedure.")
+        print("Starting 'findMoleculesEnergies' procedure.")
+        for molecule in tqdm(self.molecules, unit="molecules"):
+            if molecule.centre_of_mass is None:
+                print("Molecule lack centre of mass. Executing 'findMoleculesCOM' procedure.")
                 self.findMoleculesCOM()
+            kinetic = 0
+            internal = 0
+            for atom in molecule.atoms:
+                kinetic += atom.mass * sum(np.array(atom.velocity)**2) / 2
+                v = np.array(atom.velocity) - np.array(molecule.centre_of_mass["v"])
+                internal += atom.mass * sum(v**2) / 2
+            molecule.energy["kinetic"] = kinetic
+            molecule.energy["internal"] = internal
+            molecule.energy["translational"] = molecule.mass * sum(np.array(molecule.centre_of_mass["v"])**2) / 2
 
-    def findEjected(self, height):
+    def findEjected(self, height, r=10000000):  # r = 1 mm
         """Find ejected molecules.
 
         Find molecules that are higher than specified height (in z direction).
@@ -1150,6 +1287,26 @@ class AtomsSystem:  # TODO: change tuples to lists
             except StopError:
                 continue
         print("\nFound " + str(len(self.molecules_ejected)) + " molecules that are ejected.")
+        for molecule_nr, molecule in tqdm(enumerate(self.molecules_ejected), unit="molecules"):
+            v = np.array(molecule.centre_of_mass["v"])
+            coords = np.array(molecule.centre_of_mass["coords"])
+            a = sum(v ** 2)
+            b = sum(2 * v * coords)
+            c = -r ** 2 + sum(coords ** 2)
+            t = (-b + math.sqrt(b ** 2 - 4 * a * c)) / (2 * a)
+            if t < 0:
+                t2 = (-b - math.sqrt(b ** 2 - 4 * a * c)) / (2 * a)
+                if t2 < 0:
+                    if t2 > t:
+                        t = t2
+                else:
+                    t = t2
+            coords_new = coords + v * t
+            if not math.isinf(coords_new[0]) and not math.isinf(coords_new[1]) and not math.isinf(coords_new[2]):
+                theta = math.atan2(coords_new[1], coords_new[0])  # 0 <= theta < 2 pi (longitude)
+                phi = math.acos(coords_new[2] / r)  # 0 <= phi <= pi (latitude)
+                if phi < math.pi / 2:  # for hemisphere 0 <= phi <= pi/2
+                    molecule.spherical_destination = [phi, theta]
         print("----------")
 
     def saveMassSpectrum(self, file_path, rounding=0):
@@ -1164,11 +1321,11 @@ class AtomsSystem:  # TODO: change tuples to lists
                   "If this is not what you want run 'findEjected' procedure before this one.")
             self.findEjected(0.0)
         print("Starting 'saveMassSpectrum' procedure.")
-        if len(self.molecules_ejected) > 0:
-            spectrum_numbers = []
-            spectrum_masses = []
-            spectrum_names = []
-            for molecule in tqdm(self.molecules_ejected, total=len(self.molecules_ejected), unit="mol"):
+        spectrum_numbers = []
+        spectrum_masses = []
+        spectrum_names = []
+        for molecule in tqdm(self.molecules_ejected, total=len(self.molecules_ejected), unit="mol"):
+            if molecule.spherical_destination is not None:
                 mass = round(molecule.mass, rounding)
                 if mass not in spectrum_masses:
                     spectrum_masses.append(mass)
@@ -1178,18 +1335,31 @@ class AtomsSystem:  # TODO: change tuples to lists
                     spectrum_numbers[spectrum_masses.index(mass)] += 1
                     if molecule.name not in spectrum_names[spectrum_masses.index(mass)]:
                         spectrum_names[spectrum_masses.index(mass)].append(molecule.name)
-            spectrum = list(zip(spectrum_masses, spectrum_numbers, spectrum_names))
-            spectrum.sort()
+        spectrum = list(zip(spectrum_masses, spectrum_numbers, spectrum_names))
+        spectrum.sort()
+        if len(spectrum) > 0:
             print("\nFound", len(spectrum), "distinct masses, from", spectrum[0][0], "to", str(spectrum[-1][0]) +
                   ", consisting of", sum(map(len, spectrum_names)), "distinct compounds.")
-            print("Saving data to the file.")
-            os.makedirs(os.path.dirname(file_path), exist_ok=True)
-            with open(file_path, "w") as f:
-                for item in tqdm(spectrum):
-                    f.write("\t".join([str(i) for i in item[:2]]) + "\t" + ", ".join([str(i) for i in item[2]]) + "\n")
-            print("Saved data to file " + file_path)
         else:
-            print("No ejected molecules in the system. Nothing to prepare mass spectrum from. Nothing was saved.")
+            print("No ejected molecules found.")
+            spectrum = []
+        global abundand_molecules
+        abundand_molecules = []
+        item_counter = 0
+        for item in reversed(sorted(spectrum, key=itemgetter(1))):
+            if round(item[0]) > 12:
+                abundand_molecules.append([item[0], item[1], ", ".join([str(i) for i in item[2]])])
+                item_counter += 1
+            if item_counter == 10:
+                break
+        print("Saving data to the file.")
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        with open(file_path, "w", newline="") as file:
+            csvfile = csv.writer(file, delimiter="\t")
+            csvfile.writerow(["Mass [g/mol]", "Number", "Names"])
+            for item in tqdm(spectrum):
+                csvfile.writerow([item[0], item[1], ", ".join([str(i) for i in item[2]])])
+        print("Saved data to file " + file_path)
         print("----------")
 
     def saveMasses(self, file_path):
@@ -1202,19 +1372,21 @@ class AtomsSystem:  # TODO: change tuples to lists
         graph = 0
         phe = 0
         for molecule in tqdm(self.molecules_ejected, total=len(self.molecules_ejected), unit="mol"):
-            for atom in molecule.atoms:
-                if atom.type == 6:
-                    C60 += atom.mass
-                elif atom.type == 1:
-                    graph += atom.mass
-                else:
-                    phe += atom.mass
+            if molecule.spherical_destination is not None:
+                for atom in molecule.atoms:
+                    if atom.type == 6:
+                        C60 += atom.mass
+                    elif atom.type == 1:
+                        graph += atom.mass
+                    else:
+                        phe += atom.mass
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
-        with open(file_path, "w") as file:
-            file.write("Total mass:\t" + str(C60 + graph + phe) + "\n")
-            file.write("C60 mass:\t" + str(C60) + "\n")
-            file.write("Graphene mass:\t" + str(graph) + "\n")
-            file.write("Phenylalanine mass:\t" + str(phe) + "\n")
+        with open(file_path, "w", newline="") as file:
+            csvfile = csv.writer(file, delimiter="\t")
+            csvfile.writerow(["Total mass:", C60 + graph + phe])
+            csvfile.writerow(["C60 mass:", C60])
+            csvfile.writerow(["Graphene mass:", graph])
+            csvfile.writerow(["Phenylalanine mass:", phe])
         print("----------")
 
     def saveEnergies(self, file_path):
@@ -1223,22 +1395,16 @@ class AtomsSystem:  # TODO: change tuples to lists
         :param file_path: [str] - path to the file
         """
         print("Starting 'saveEnergies' procedure.")
-        COM = []
-        internal = []
-        for molecule in tqdm(self.molecules_ejected, unit="mol"):
-            if molecule.name == "C9H11NO2":
-                COM.append(molecule.energy["kinetic"][0])
-                energy_total = 0
-                for atom in molecule.atoms:
-                    v = np.array(atom.velocity) - molecule.velocity[1]
-                    energy_total += atom.mass * math.sqrt(sum(v**2))**2 / 2
-                internal.append(energy_total)
-        COM.sort()
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
-        with open(file_path, "w") as file:
-            file.write("Phenylalanine COM kinetic energies:\t" + "\t".join([str(energy) for energy in COM]) + "\n")
-            file.write("Phenylalanine internal kinetic energies:\t" + "\t".join([str(energy) for energy in internal]) +
-                       "\n")
+        with open(file_path, "w", newline="") as file:
+            csvfile = csv.writer(file, delimiter="\t")
+            csvfile.writerow(["Total", "Internal", "Translational"])
+            for molecule in tqdm(self.molecules_ejected, unit="mol"):
+                if molecule.name == "C9H11NO2" and molecule.spherical_destination is not None:
+                    total = molecule.energy["kinetic"] * 103.6427  # conversion to eV
+                    internal = molecule.energy["internal"] * 103.6427  # conversion to eV
+                    translational = molecule.energy["translational"] * 103.6427  # conversion to eV
+                    csvfile.writerow([total, internal, translational])
         print("----------")
 
     def saveSpotPlot(self, file_path, r=10000000):  # TODO: Write better docstring
@@ -1250,28 +1416,101 @@ class AtomsSystem:  # TODO: change tuples to lists
         print("Starting 'saveSpotPlot' procedure.")
         coords_all = []
         masses_all = []
-        for molecule in tqdm(self.molecules_ejected, unit="mol"):
-            masses_all.append(molecule.mass)
-            v = np.array(molecule.velocity[1])
-            coords = np.array(molecule.centre_of_mass)
-            a = sum(v**2)
-            b = sum(2 * v * coords)
-            c = -r**2+sum(coords**2)
-            t = (-b + math.sqrt(b**2 - 4 * a * c)) / (2 * a)
-            if t < 0:
-                t2 = (-b - math.sqrt(b**2 - 4 * a * c)) / (2 * a)
-                if t2 < 0:
-                    if t2 > t:
-                        t = t2
-                else:
-                    t = t2
-            coords_new = coords + v * t
-            theta = math.atan2(coords_new[1], coords_new[0])
-            phi = math.acos(coords_new[2] / r)
-            coords_all.append([phi, theta])
+        names_all = []
+        id_all = []
+        for molecule_nr, molecule in tqdm(enumerate(self.molecules_ejected), unit="molecules"):
+            if molecule.spherical_destination is not None:
+                masses_all.append(molecule.mass)
+                names_all.append(molecule.name)
+                id_all.append(molecule.id)
+                coords_all.append(molecule.spherical_destination)
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
-        with open(file_path, "w") as file:
-            file.write("phi [rad]\ttheta [rad]\tmass [g/mol]\n")
-            for coord, mass in zip(coords_all, masses_all):
-                file.write(str(coord[0]) + "\t" + str(coord[1]) + "\t" + str(mass) + "\n")
+        with open(file_path, "w", newline="") as file:
+            csvfile = csv.writer(file, delimiter="\t")
+            csvfile.writerow(["id", "name", "mass [g/mol]", "latitude [rad]", "longitude [rad]"])
+            for id_nr, coord, mass, name in zip(id_all, coords_all, masses_all, names_all):
+                csvfile.writerow([id_nr, name, mass, coord[0], coord[1]])
+        print("-"*10)
+
+    def save_angle_distribution(self, file_path, r=10000000, dphi=3):  # TODO: there is a lot copied from spot plot
+        print("Angle distribution")
+        global abundand_molecules
+        coords_all = []
+        masses_all = []
+        names_all = []
+        id_all = []
+        for molecule_nr, molecule in tqdm(enumerate(self.molecules_ejected), unit="molecules"):
+            if molecule.spherical_destination is not None:
+                masses_all.append(molecule.mass)
+                names_all.append(molecule.name)
+                id_all.append(molecule.id)
+                coords_all.append(molecule.spherical_destination[0])
+        dphi = dphi * math.pi / 180  # in radians
+        data = zip(id_all, coords_all, masses_all, names_all)
+        data = sorted(data, key=itemgetter(1))
+        current_angle = 0
+        angle_distribution = []
+        current_distribution = []
+        for point in data:
+            if point[1] < current_angle + dphi:
+                current_distribution.append(point)
+            else:
+                angle_distribution.append(current_distribution)
+                while True:
+                    current_angle += dphi
+                    if point[1] < current_angle + dphi:
+                        break
+                    else:
+                        angle_distribution.append([])
+                current_distribution = [point]
+        angle_distribution.append(current_distribution)
+        angle_mass_distributions = []
+        abundand_masses = [round(mol[0], 3) for mol in abundand_molecules]
+        for angle_nr, angle_points in enumerate(angle_distribution):
+            angle = angle_nr * dphi
+            mass_sums = [0] * (len(abundand_molecules) + 1)
+            for point in angle_points:
+                if round(point[2], 3) in abundand_masses:
+                    mass_sums[abundand_masses.index(round(point[2], 3))] += point[2]
+                else:
+                    mass_sums[-1] += point[2]
+            surface_1 = 2 * math.pi * r * r * (1 - math.cos(angle))
+            if angle + dphi <= math.pi / 2:
+                surface_2 = 2 * math.pi * r * r * (1 - math.cos(angle + dphi))
+            else:
+                surface_2 = 2 * math.pi * r * r * (1 - math.cos(math.pi / 2))
+            surface = surface_2 - surface_1
+            masses_scaled = [mass_sum / surface for mass_sum in mass_sums]
+            angle_mass_distributions.append(masses_scaled)
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        with open(file_path, "w", newline="") as file:
+            csvfile = csv.writer(file, delimiter="\t")
+            csvfile.writerow(["dphi = " + str(dphi), "first column is a mass, last row consists of all other masses",
+                              "mass / surface of the sphere ring",
+                              "scaled mass sums in consecutive angle intervals, last interval most often smaller "
+                              "(ends at pi/2)"])
+            for dist_nr, dist in enumerate(zip(*angle_mass_distributions)):
+                row = list(dist)[:]
+                if dist_nr >= len(abundand_masses):
+                    row.insert(0, "other")
+                else:
+                    row.insert(0, abundand_masses[dist_nr])
+                csvfile.writerow(row)
         print("----------")
+
+    def saveHelper(self, file_path):
+        """Helper function."""
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
+        for molecule_nr, molecule in enumerate(self.molecules_ejected):
+            if molecule_nr == 45:
+                file = file_path + str(molecule_nr) + ".txt"
+                with open(file, "w", newline="") as file:
+                    csvfile = csv.writer(file, delimiter="\t")
+                    csvfile.writerow(["name", "mass"])
+                    csvfile.writerow([molecule.name,
+                                      molecule.mass])
+                    csvfile.writerow(["Atoms:"])
+                    csvfile.writerow(["id", "Mass [g/mol]", "x", "y", "z"])
+                    for atom in molecule.atoms:
+                        csvfile.writerow([atom.id, atom.mass, atom.coords[0], atom.coords[1], atom.coords[2]])
